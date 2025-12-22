@@ -12,8 +12,17 @@ $ ./formater.sh name-event
 Cut each video manually and export them to ~/Videos/eventos/name-event/cortado
 
 ```sh
-$ ./edit.sh -e <event_name> -t "<event_text>" -m <music_path> -l <logo_video_path> [-i <client_image_path>] [-c "<client_text>"] [-C "<client_color>"] [-T "<text_color>"]
+$ ./edit.sh -e <event_name> -t "<event_text>" -m <music> -l <logo_video> \
+            [-i <client_image>] [-c "<client_text>"] [-C "<client_color>"] \
+            [-T "<text_color>"]
 ```
+
+Construct the command here, then copy to the terminal
+
+```sh
+./edit.sh 
+```
+
 
 ---
 
@@ -70,13 +79,7 @@ Resolution: min 720x1280
 ---
 
 Fonts
-BeauRivage-Regular.ttf
-Calligraffitti-Regular.ttf
+
 Courgette-Regular.ttf
-Ephesis-Regular.ttf
-Felipa-Regular.ttf
 MysteryQuest-Regular.ttf
-Parisienne-Regular.ttf
-PetitFormalScript-Regular.ttf
-PinyonScript-Regular.ttf
 SansitaSwashed-VariableFont_wght.ttf

@@ -8,25 +8,9 @@ VIDEO_HEIGHT=1920
 # Duration of the transition effect in second
 TRANSITION_DURATION=1
  
-# Client text styling (only appears with client image)
-CLIENT_TEXT_X="(w-tw)/2"
-CLIENT_TEXT_Y="(h-th)/1.25"
-CLIENT_FONT_FILE="/usr/local/share/fonts/Kapakana-VariableFont_wght.ttf"
-CLIENT_FONT_SIZE=100
-CLIENT_FONT_COLOR="#FFFFFF"
-CLIENT_BORDER_WIDTH=3
-CLIENT_BORDER_COLOR="#000000"
-
-# Event text styling (appears during filmed video)
-
-# Text position
-TEXT_X="w-tw-20"
-# H-text_height-20
-TEXT_Y="H-th-20"
+# Common text styling
 # Line spacing (pixels between lines)
 LINE_SPACING=10
-# Full path to font file
-FONT_FILE="/usr/local/share/fonts/Kapakana-VariableFont_wght.ttf"
 FONT_SIZE=80
 # Font color in FFmpeg hex format: [0x|#]RRGGBB[AA]
 FONT_COLOR="#E6E70F"
@@ -34,6 +18,16 @@ FONT_COLOR="#E6E70F"
 BORDER_WIDTH=2
 # Border color in FFmpeg hex format: [0x|#]RRGGBB[AA]
 BORDER_COLOR="#000000"
+# Box padding, some fonts get clipped otherwise
+BOX_PADDING=8
+
+# Client text styling (only appears with client image)
+CLIENT_TEXT_X="(w-tw)/2-$BOX_PADDING"
+CLIENT_TEXT_Y="(h-th)/1.25"
+
+# Event text styling (appears during filmed video)
+TEXT_X="w-tw-20-$BOX_PADDING"
+TEXT_Y="H-th-20"
 
 # Define your base video directory (e.g., ~/Videos)
 BASE_VIDEOS_DIR="$HOME/Videos/eventos"
@@ -45,26 +39,28 @@ CLIENT_TIME=5
 # Initialize variables with default or empty values
 EVENT_NAME=""
 EVENT_TEXT=""
-MUSIC_PATH=""
-CLIENT_PATH=""
+MUSIC="$BASE_VIDEOS_DIR/assets/musica/"
+CLIENT_IMAGE="$BASE_VIDEOS_DIR/"
 CLIENT_TEXT=""
-CLIENT_COLOR_ARG=""
-EVENT_COLOR_ARG=""
-LOGO_PATH=""
+CLIENT_COLOR=""
+EVENT_COLOR=""
+LOGO="$BASE_VIDEOS_DIR/assets/logo/"
+FONT="/usr/local/share/fonts/"
 
 # A helper function to display usage information
 usage() {
-    echo "Usage: $0 -e <event_name> -t \"<event_text>\" -m <music_path> -l <logo_video_path> [-i <client_image_path>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"]"
+    echo "Usage: $0 -e <event_name> -t \"<event_text>\" -m <music> -l <logo_video> [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>]"
     echo ""
     echo "  -e, --event        : Name of the event ."
     echo "                       This is used for directory paths and output filenames."
     echo "  -t, --text         : Text to overlay on all videos for this event (enclose in quotes if it has spaces)."
-    echo "  -m, --music        : Full path to the background music file (e.g., ~/Videos/eventos/assets/event_jingle.mp3)."
-    echo "  -i, --image        : (Optional) Full path to client image to display at the beginning (e.g., ~/Videos/eventos/evento1/client_logo.png)."
+    echo "  -m, --music        : Full path to the background music file (e.g., event_jingle.mp3)."
+    echo "  -i, --image        : (Optional) Full path to client image to display at the beginning (e.g., client_logo.png)."
     echo "  -c, --client       : (Optional) Client text to display over client image (enclose in quotes if it has spaces)."
     echo "  -C, --client-color : (Optional) Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
     echo "  -T, --text-color   : (Optional) Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
-    echo "  -l, --logo         : Full path to logo video to display at the end (e.g., ~/Videos/eventos/assets/logo1/logo1.mp4)."
+    echo "  -l, --logo         : Full path to logo video to display at the end (e.g., logo1.mp4)."
+    echo "  -f, --font         : Font filename to use for event text (e.g., MyFont.ttf)."
     echo ""
     exit 2
 }
@@ -82,11 +78,11 @@ while [[ "$#" -gt 0 ]]; do
             ;;
 
         -m|--music)
-            MUSIC_PATH="$2"
+            MUSIC+="$2"
             shift # past argument
             ;;
         -i|--image)
-            CLIENT_PATH="$2"
+            CLIENT_IMAGE+="$EVENT_NAME/$2"
             shift # past argument
             ;;
         -c|--client)
@@ -94,15 +90,19 @@ while [[ "$#" -gt 0 ]]; do
             shift # past argument
             ;;
         -C|--client-color)
-            CLIENT_COLOR_ARG="$2"
+            CLIENT_COLOR="$2"
             shift # past argument
             ;;
         -T|--text-color)
-            EVENT_COLOR_ARG="$2"
+            EVENT_COLOR="$2"
             shift # past argument
             ;;
         -l|--logo)
-            LOGO_PATH="$2"
+            LOGO+="$2"
+            shift # past argument
+            ;;
+        -f|--font)
+            FONT+="$2"
             shift # past argument
             ;;
         -h|--help)
@@ -117,8 +117,8 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # --- Validate Required Arguments ---
-if [ -z "$EVENT_NAME" ] || [ -z "$EVENT_TEXT" ] || [ -z "$MUSIC_PATH" ] || [ -z "$LOGO_PATH" ]; then
-    echo "Error: All required arguments (-e, -t, -m, -l) must be provided."
+if [ -z "$EVENT_NAME" ] || [ -z "$EVENT_TEXT" ] || [ -z "$MUSIC" ] || [ -z "$LOGO" ] || [ -z "$FONT" ]; then
+    echo "Error: All required arguments (-e, -t, -m, -l, -f) must be provided."
     usage
 fi
 
@@ -126,8 +126,8 @@ fi
 CUTTED_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME/cortado"
 EDITADOS_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME/editado"
 
-if [ ! -f "$MUSIC_PATH" ]; then
-    echo "Error: Music file not found at '$MUSIC_PATH'"
+if [ ! -f "$MUSIC" ]; then
+    echo "Error: Music file not found at '$MUSIC'"
     exit 1
 fi
 if [ ! -d "$CUTTED_DIR" ]; then
@@ -135,50 +135,50 @@ if [ ! -d "$CUTTED_DIR" ]; then
     echo "Please perform manual cuts in Shotcut first and export videos there."
     exit 1
 fi
-if [ ! -f "$FONT_FILE" ]; then
-    echo "Error: Font file not found at '$FONT_FILE'. Please ensure it's installed or provide a correct path."
+if [ ! -f "$FONT" ]; then
+    echo "Error: Font file not found at '$FONT'. Please ensure it's installed or provide a correct path."
     echo "You can list available fonts with: fc-list | rg .ttf"
     exit 1
 fi
 
-if [ -n "$CLIENT_PATH" ] && [ ! -f "$CLIENT_PATH" ]; then
-    echo "Error: Client image file not found at '$CLIENT_PATH'"
+if [ -n "$CLIENT_IMAGE" ] && [ ! -f "$CLIENT_IMAGE" ]; then
+    echo "Error: Client image file not found at '$CLIENT_IMAGE'"
     exit 1
 fi
 
-if [ ! -f "$LOGO_PATH" ]; then
-    echo "Error: Logo video file not found at '$LOGO_PATH'"
+if [ ! -f "$LOGO" ]; then
+    echo "Error: Logo video file not found at '$LOGO'"
     exit 1
 fi
 
 # --- Apply color overrides if provided ---
-if [ -n "$CLIENT_COLOR_ARG" ]; then
-    CLIENT_FONT_COLOR="$CLIENT_COLOR_ARG"
+if [ -n "$CLIENT_COLOR" ]; then
+    FONT_COLOR="$CLIENT_COLOR"
 fi
 
-if [ -n "$EVENT_COLOR_ARG" ]; then
-    FONT_COLOR="$EVENT_COLOR_ARG"
+if [ -n "$EVENT_COLOR" ]; then
+    FONT_COLOR="$EVENT_COLOR"
 fi
  
 echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
 echo "Text for videos: \"$EVENT_TEXT\""
-echo "Music: $MUSIC_PATH"
-if [ -n "$CLIENT_PATH" ]; then
-    echo "Client image: $CLIENT_PATH (will display for $CLIENT_TIME seconds)"
+echo "Music: $MUSIC"
+if [ -n "$CLIENT_IMAGE" ]; then
+    echo "Client image: $CLIENT_IMAGE (will display for $CLIENT_TIME seconds)"
     if [ -n "$CLIENT_TEXT" ]; then
         echo "Client text: \"$CLIENT_TEXT\""
     fi
 fi
-echo "Logo video: $LOGO_PATH"
+echo "Logo video: $LOGO"
 echo "Output to: $EDITADOS_DIR"
 echo "------------------------------------------------------------------"
 
 processed_count=1
 
 # --- Get Logo Duration if provided ---
-LOGO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$LOGO_PATH" | cut -d'.' -f1)
+LOGO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$LOGO" | cut -d'.' -f1)
 if [ -z "$LOGO_DURATION" ]; then
-	echo "Error: Could not determine duration for $LOGO_PATH."
+	echo "Error: Could not determine duration for $LOGO."
 	exit 1
 fi
  
@@ -203,7 +203,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         fi
        
         # Determine the structure based on what's provided
-        if [ -n "$CLIENT_PATH" ]; then
+        if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
             # Logo is already upscaled to match input_video (1080x1920 @ 30fps)
             CONTENT_DURATION=$((CLIENT_TIME + VIDEO_DURATION))  # Duration that music covers (client + input_video)
@@ -214,7 +214,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Fades apply only to the content part (client + input_video), not logo
             VIDEO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
-            AUDIO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
+			# This is not used in the code
+            # AUDIO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
             
             TEXT_FADE_IN_START=$CLIENT_TRANSITION_START
             TEXT_FADE_IN_END=$CLIENT_TIME
@@ -230,21 +231,24 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[2:v]fps=30,setpts=PTS-STARTPTS[logo];"
             
             # First transition: client to input_video
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[client][video]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$CLIENT_TRANSITION_START[client_video_raw];"
             
             # Apply fade in to content portion (no fade out, to allow xfade to logo)
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[client_video_raw]fade=t=in:st=0:d=$TRANSITION_DURATION[client_video];"
             
             # Second transition: faded client_video to logo
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[client_video][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
             # Add event text overlay (text fades in during transition2: client->video xfade)
-            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT_FILE:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TEXT_FADE_IN_START),0,if(lt(t,$TEXT_FADE_IN_END),(t-$TEXT_FADE_IN_START)/$TRANSITION_DURATION,if(gt(t,$TEXT_FADE_OUT_START),(1-(t-$TEXT_FADE_OUT_START)/$TRANSITION_DURATION),1)))'"
+            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TEXT_FADE_IN_START),0,if(lt(t,$TEXT_FADE_IN_END),(t-$TEXT_FADE_IN_START)/$TRANSITION_DURATION,if(gt(t,$TEXT_FADE_OUT_START),(1-(t-$TEXT_FADE_OUT_START)/$TRANSITION_DURATION),1)))'"
             
             # Add client text overlay if provided (only during client image: 0 to CLIENT_TIME)
             if [ -n "$CLIENT_TEXT" ]; then
                 CLIENT_TEXT_FADE_OUT_START=$CLIENT_TRANSITION_START
-                FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$CLIENT_FONT_FILE:fontsize=$CLIENT_FONT_SIZE:fontcolor=$CLIENT_FONT_COLOR:borderw=$CLIENT_BORDER_WIDTH:bordercolor=$CLIENT_BORDER_COLOR:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$CLIENT_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0)))'"
+                FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$CLIENT_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0)))'"
             fi
             
             FILTER_COMPLEX+="[v_out];"
@@ -254,13 +258,14 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$CONTENT_DURATION,asetpts=PTS-STARTPTS[music];"
             # Acrossfade to logo audio, then fade out at the very end
             LOGO_FADEOUT_START=$((TOTAL_DURATION - TRANSITION_DURATION))
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[music][2:a]acrossfade=d=$TRANSITION_DURATION,afade=t=out:st=$LOGO_FADEOUT_START:d=$TRANSITION_DURATION[a_out]"
             
             ffmpeg -v warning \
-                   -loop 1 -t "$CLIENT_TIME" -i "$CLIENT_PATH" \
+                   -loop 1 -t "$CLIENT_TIME" -i "$CLIENT_IMAGE" \
                    -i "$input_video_path" \
-                   -i "$LOGO_PATH" \
-                   -i "$MUSIC_PATH" \
+                   -i "$LOGO" \
+                   -i "$MUSIC" \
                    -filter_complex "$FILTER_COMPLEX" \
                    -map "[v_out]" \
                    -map "[a_out]" \
@@ -282,7 +287,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             LOGO_TRANSITION_START=$((CONTENT_DURATION - TRANSITION_DURATION))
             VIDEO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
-            AUDIO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
+            # This is not used in the code
+			# AUDIO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
             
             echo "Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${CONTENT_DURATION}s)"
             
@@ -292,25 +298,28 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[1:v]fps=30,setpts=PTS-STARTPTS[logo];"
             
             # Apply fade in to video BEFORE combining with logo (no fade out)
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[video_raw]fade=t=in:st=0:d=$TRANSITION_DURATION[video];"
             
             # Transition from input_video to logo
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[video][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
             # Add text overlay (text only appears during content portion, not logo)
-            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT_FILE:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1))'[v_out];"
+            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1))'[v_out];"
             
             # Audio: Music fades in, plays through content, acrossfade to logo audio, logo audio fades out at end
             # Music track: fade in at start, trim to exactly CONTENT_DURATION (no fade out, acrossfade handles transition)
             FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$CONTENT_DURATION,asetpts=PTS-STARTPTS[music];"
             # Acrossfade to logo audio, then fade out at the very end
             LOGO_FADEOUT_START=$((TOTAL_DURATION - TRANSITION_DURATION))
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[music][1:a]acrossfade=d=$TRANSITION_DURATION,afade=t=out:st=$LOGO_FADEOUT_START:d=$TRANSITION_DURATION[a_out]"
 
             ffmpeg -v warning \
                    -i "$input_video_path" \
-                   -i "$LOGO_PATH" \
-                   -i "$MUSIC_PATH" \
+                   -i "$LOGO" \
+                   -i "$MUSIC" \
                    -filter_complex "$FILTER_COMPLEX" \
                    -map "[v_out]" \
                    -map "[a_out]" \
@@ -325,6 +334,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                    "$output_file_path"
         fi
 
+		# I think this is better because of how large the command is
         if [ $? -eq 0 ]; then
 			((processed_count++))
             echo "Successfully processed '$original_filename' to '$output_filename'"
