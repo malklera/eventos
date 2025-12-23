@@ -22,11 +22,11 @@ BORDER_COLOR="#000000"
 BOX_PADDING=8
 
 # Client text styling (only appears with client image)
-CLIENT_TEXT_X="(w-tw)/2-$BOX_PADDING"
+CLIENT_TEXT_X="(w-tw)/2"
 CLIENT_TEXT_Y="(h-th)/1.25"
 
 # Event text styling (appears during filmed video)
-TEXT_X="w-tw-20-$BOX_PADDING"
+TEXT_X="w-tw-20"
 TEXT_Y="H-th-20"
 
 # Define your base video directory (e.g., ~/Videos)
@@ -35,21 +35,9 @@ BASE_VIDEOS_DIR="$HOME/Videos/eventos"
 # Client image display duration (in seconds)
 CLIENT_TIME=5
 
-# --- Argument Parsing ---
-# Initialize variables with default or empty values
-EVENT_NAME=""
-EVENT_TEXT=""
-MUSIC="$BASE_VIDEOS_DIR/assets/musica/"
-CLIENT_IMAGE="$BASE_VIDEOS_DIR/"
-CLIENT_TEXT=""
-CLIENT_COLOR=""
-EVENT_COLOR=""
-LOGO="$BASE_VIDEOS_DIR/assets/logo/"
-FONT="/usr/local/share/fonts/"
-
 # A helper function to display usage information
 usage() {
-    echo "Usage: $0 -e <event_name> -t \"<event_text>\" -m <music> -l <logo_video> [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>]"
+    echo "Usage: $0 -e <event_name> -t \"<event_text>\" -m <music> -l <logo_video> [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
     echo ""
     echo "  -e, --event        : Name of the event ."
     echo "                       This is used for directory paths and output filenames."
@@ -61,6 +49,8 @@ usage() {
     echo "  -T, --text-color   : (Optional) Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
     echo "  -l, --logo         : Full path to logo video to display at the end (e.g., logo1.mp4)."
     echo "  -f, --font         : Font filename to use for event text (e.g., MyFont.ttf)."
+    echo "  -L, --left         : (Optional) Path to icon image to display to the left of client text."
+    echo "  -R, --right        : (Optional) Path to icon image to display to the right of client text."
     echo ""
     exit 2
 }
@@ -78,11 +68,11 @@ while [[ "$#" -gt 0 ]]; do
             ;;
 
         -m|--music)
-            MUSIC+="$2"
+            MUSIC="$BASE_VIDEOS_DIR/assets/musica/$2"
             shift # past argument
             ;;
         -i|--image)
-            CLIENT_IMAGE+="$EVENT_NAME/$2"
+            CLIENT_IMAGE="$BASE_VIDEOS_DIR/$EVENT_NAME/$2"
             shift # past argument
             ;;
         -c|--client)
@@ -98,11 +88,19 @@ while [[ "$#" -gt 0 ]]; do
             shift # past argument
             ;;
         -l|--logo)
-            LOGO+="$2"
+            LOGO="$BASE_VIDEOS_DIR/assets/logo/$2"
             shift # past argument
             ;;
         -f|--font)
-            FONT+="$2"
+            FONT="/usr/local/share/fonts/$2"
+            shift # past argument
+            ;;
+        -L|--left)
+            ICON_LEFT="$BASE_VIDEOS_DIR/assets/icono/decoraciones/$2"
+            shift # past argument
+            ;;
+        -R|--right)
+            ICON_RIGHT="$BASE_VIDEOS_DIR/assets/icono/decoraciones/$2"
             shift # past argument
             ;;
         -h|--help)
@@ -151,6 +149,16 @@ if [ ! -f "$LOGO" ]; then
     exit 1
 fi
 
+if [ -n "$ICON_LEFT" ] && [ ! -f "$ICON_LEFT" ]; then
+    echo "Error: Left icon image file not found at '$ICON_LEFT'"
+    exit 1
+fi
+
+if [ -n "$ICON_RIGHT" ] && [ ! -f "$ICON_RIGHT" ]; then
+    echo "Error: Right icon image file not found at '$ICON_RIGHT'"
+    exit 1
+fi
+
 # --- Apply color overrides if provided ---
 if [ -n "$CLIENT_COLOR" ]; then
     FONT_COLOR="$CLIENT_COLOR"
@@ -167,6 +175,12 @@ if [ -n "$CLIENT_IMAGE" ]; then
     echo "Client image: $CLIENT_IMAGE (will display for $CLIENT_TIME seconds)"
     if [ -n "$CLIENT_TEXT" ]; then
         echo "Client text: \"$CLIENT_TEXT\""
+    fi
+    if [ -n "$ICON_LEFT" ]; then
+        echo "Left icon: $ICON_LEFT"
+    fi
+    if [ -n "$ICON_RIGHT" ]; then
+        echo "Right icon: $ICON_RIGHT"
     fi
 fi
 echo "Logo video: $LOGO"
@@ -251,7 +265,40 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$CLIENT_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0)))'"
             fi
             
-            FILTER_COMPLEX+="[v_out];"
+            # Label the output after text overlays
+            FILTER_COMPLEX+="[v_with_text];"
+            
+            # Determine the next input index based on what icons are provided
+            NEXT_INPUT=4  # Start after [3:a] (music)
+            CURRENT_STREAM="v_with_text"
+            
+            # Add left icon overlay if provided
+            if [ -n "$ICON_LEFT" ]; then
+                ICON_HEIGHT="$FONT_SIZE"  # Scale icon to match font size
+                # Scale icon maintaining aspect ratio, then apply fade in/out to match text timing
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TEXT_FADE_OUT_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
+                # Position left icon to the left of center
+                # X: Video center (W/2) minus icon width minus spacing (200px offset from center)
+                # Y: Match CLIENT_TEXT_Y formula: (H-overlay_h)/1.25 positions at ~75% down
+                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_left_scaled]overlay=x='W/2-overlay_w-200':y='(H-overlay_h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_left];"
+                CURRENT_STREAM="v_with_left"
+                ((NEXT_INPUT++))
+            fi
+            
+            # Add right icon overlay if provided
+            if [ -n "$ICON_RIGHT" ]; then
+                ICON_HEIGHT="$FONT_SIZE"  # Scale icon to match font size
+                # Scale icon maintaining aspect ratio, then apply fade in/out to match text timing
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TEXT_FADE_OUT_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
+                # Position right icon to the right of center
+                # X: Video center (W/2) plus spacing (200px offset from center)
+                # Y: Match CLIENT_TEXT_Y formula: (H-overlay_h)/1.25 positions at ~75% down
+                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_right_scaled]overlay=x='W/2+200':y='(H-overlay_h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_right];"
+                CURRENT_STREAM="v_with_right"
+            fi
+            
+            # Set final output stream
+            FILTER_COMPLEX+="[${CURRENT_STREAM}]null[v_out];"
             
             # Audio: Music fades in, plays through content, acrossfade to logo audio, logo audio fades out at end
             # Music track: fade in at start, trim to exactly CONTENT_DURATION (no fade out, acrossfade handles transition)
@@ -261,23 +308,36 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # shellcheck disable=SC1087
             FILTER_COMPLEX+="[music][2:a]acrossfade=d=$TRANSITION_DURATION,afade=t=out:st=$LOGO_FADEOUT_START:d=$TRANSITION_DURATION[a_out]"
             
-            ffmpeg -v warning \
-                   -loop 1 -t "$CLIENT_TIME" -i "$CLIENT_IMAGE" \
-                   -i "$input_video_path" \
-                   -i "$LOGO" \
-                   -i "$MUSIC" \
-                   -filter_complex "$FILTER_COMPLEX" \
-                   -map "[v_out]" \
-                   -map "[a_out]" \
-                   -t "$TOTAL_DURATION" \
-                   -c:v libx264 \
-                   -preset medium \
-                   -crf 23 \
-                   -c:a aac \
-                   -b:a 192k \
-                   -movflags +faststart \
-                   -f mp4 \
-                   "$output_file_path"
+            # Build ffmpeg command with optional icon inputs
+            FFMPEG_CMD="ffmpeg -v warning"
+            FFMPEG_CMD+=" -loop 1 -t \"$CLIENT_TIME\" -i \"$CLIENT_IMAGE\""
+            FFMPEG_CMD+=" -i \"$input_video_path\""
+            FFMPEG_CMD+=" -i \"$LOGO\""
+            FFMPEG_CMD+=" -i \"$MUSIC\""
+            
+            # Add icon inputs if provided (loop them like client image)
+            if [ -n "$ICON_LEFT" ]; then
+                FFMPEG_CMD+=" -loop 1 -t \"$CLIENT_TIME\" -i \"$ICON_LEFT\""
+            fi
+            if [ -n "$ICON_RIGHT" ]; then
+                FFMPEG_CMD+=" -loop 1 -t \"$CLIENT_TIME\" -i \"$ICON_RIGHT\""
+            fi
+            
+            FFMPEG_CMD+=" -filter_complex \"$FILTER_COMPLEX\""
+            FFMPEG_CMD+=" -map \"[v_out]\""
+            FFMPEG_CMD+=" -map \"[a_out]\""
+            FFMPEG_CMD+=" -t \"$TOTAL_DURATION\""
+            FFMPEG_CMD+=" -c:v libx264"
+            FFMPEG_CMD+=" -preset medium"
+            FFMPEG_CMD+=" -crf 23"
+            FFMPEG_CMD+=" -c:a aac"
+            FFMPEG_CMD+=" -b:a 192k"
+            FFMPEG_CMD+=" -movflags +faststart"
+            FFMPEG_CMD+=" -f mp4"
+            FFMPEG_CMD+=" \"$output_file_path\""
+            
+            # Execute the command
+            eval "$FFMPEG_CMD"
                    
 		else
             # Case 2: Main Video + Logo Video (no client)
