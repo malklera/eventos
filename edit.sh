@@ -159,6 +159,16 @@ if [ -n "$ICON_RIGHT" ] && [ ! -f "$ICON_RIGHT" ]; then
     exit 1
 fi
 
+# --- Validate Icons vs Client Text dependency ---
+if [ -z "$CLIENT_TEXT" ]; then
+    if [ -n "$ICON_LEFT" ] || [ -n "$ICON_RIGHT" ]; then
+        echo "Warning: Icons (--left/-L or --right/-R) were provided but no client text (--client/-c) was specified."
+        echo "Icons will be ignored as they are designed to flank the client text."
+        ICON_LEFT=""
+        ICON_RIGHT=""
+    fi
+fi
+
 # --- Apply color overrides if provided ---
 if [ -n "$CLIENT_COLOR" ]; then
     FONT_COLOR="$CLIENT_COLOR"
@@ -256,8 +266,17 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # shellcheck disable=SC1087
             FILTER_COMPLEX+="[client_video][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
+            
             # Add event text overlay (text fades in during transition2: client->video xfade)
             FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TEXT_FADE_IN_START),0,if(lt(t,$TEXT_FADE_IN_END),(t-$TEXT_FADE_IN_START)/$TRANSITION_DURATION,if(gt(t,$TEXT_FADE_OUT_START),(1-(t-$TEXT_FADE_OUT_START)/$TRANSITION_DURATION),1)))'"
+            
+            # Estimate text width for icon positioning (if CLIENT_TEXT exists)
+            if [ -n "$CLIENT_TEXT" ]; then
+                # Average character width 0.37 * font_size for most fonts, this seems to work ok
+                CHAR_COUNT=${#CLIENT_TEXT}
+                ESTIMATED_TEXT_WIDTH=$(awk "BEGIN {printf \"%.0f\", $CHAR_COUNT * $FONT_SIZE * 0.37}")
+                echo "Debug: Text '$CLIENT_TEXT' ($CHAR_COUNT chars) -> Estimated visual width: $ESTIMATED_TEXT_WIDTH px"
+            fi
             
             # Add client text overlay if provided (only during client image: 0 to CLIENT_TIME)
             if [ -n "$CLIENT_TEXT" ]; then
@@ -275,12 +294,17 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Add left icon overlay if provided
             if [ -n "$ICON_LEFT" ]; then
                 ICON_HEIGHT="$FONT_SIZE"  # Scale icon to match font size
+                ICON_SPACING=20  # Spacing between icon and text in pixels
+                
+                # Calculate icon X position: center minus half text width minus icon width minus spacing
+                # Use max(0, ...) to ensure icon stays on screen even if text is wide
+                ICON_LEFT_X="max(0,W/2-$ESTIMATED_TEXT_WIDTH/2-w-$ICON_SPACING)"
+                
                 # Scale icon maintaining aspect ratio, then apply fade in/out to match text timing
-                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TEXT_FADE_OUT_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
-                # Position left icon to the left of center
-                # X: Video center (W/2) minus icon width minus spacing (200px offset from center)
-                # Y: Match CLIENT_TEXT_Y formula: (H-overlay_h)/1.25 positions at ~75% down
-                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_left_scaled]overlay=x='W/2-overlay_w-200':y='(H-overlay_h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_left];"
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
+                # Position left icon to the left of the text
+                # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
+                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_left_scaled]overlay=x='$ICON_LEFT_X':y='(H-h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_left];"
                 CURRENT_STREAM="v_with_left"
                 ((NEXT_INPUT++))
             fi
@@ -288,12 +312,17 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Add right icon overlay if provided
             if [ -n "$ICON_RIGHT" ]; then
                 ICON_HEIGHT="$FONT_SIZE"  # Scale icon to match font size
+                ICON_SPACING=20  # Spacing between icon and text in pixels
+                
+                # Calculate icon X position: center plus half text width plus spacing
+                # Use min(W-w, ...) to ensure icon stays on screen
+                ICON_RIGHT_X="min(W-w,W/2+$ESTIMATED_TEXT_WIDTH/2+$ICON_SPACING)"
+                
                 # Scale icon maintaining aspect ratio, then apply fade in/out to match text timing
-                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TEXT_FADE_OUT_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
-                # Position right icon to the right of center
-                # X: Video center (W/2) plus spacing (200px offset from center)
-                # Y: Match CLIENT_TEXT_Y formula: (H-overlay_h)/1.25 positions at ~75% down
-                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_right_scaled]overlay=x='W/2+200':y='(H-overlay_h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_right];"
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
+                # Position right icon to the right of the text
+                # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
+                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_right_scaled]overlay=x='$ICON_RIGHT_X':y='(H-h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_right];"
                 CURRENT_STREAM="v_with_right"
             fi
             
