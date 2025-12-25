@@ -229,7 +229,6 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
-            # Logo is already upscaled to match input_video (1080x1920 @ 30fps)
             CONTENT_DURATION=$((CLIENT_TIME + VIDEO_DURATION))  # Duration that music covers (client + input_video)
             TOTAL_DURATION=$((CONTENT_DURATION + LOGO_DURATION))
             
@@ -238,8 +237,6 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Fades apply only to the content part (client + input_video), not logo
             VIDEO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
-			# This is not used in the code
-            # AUDIO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
             
             TEXT_FADE_IN_START=$CLIENT_TRANSITION_START
             TEXT_FADE_IN_END=$CLIENT_TIME
@@ -251,7 +248,6 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Scale and prepare all video inputs
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT:force_original_aspect_ratio=decrease,pad=$VIDEO_WIDTH:$VIDEO_HEIGHT:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS[client];"
             FILTER_COMPLEX+="[1:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video];"
-            # Logo video is already at correct resolution and fps, just ensure timestamps
             FILTER_COMPLEX+="[2:v]fps=30,setpts=PTS-STARTPTS[logo];"
             
             # First transition: client to input_video
@@ -370,20 +366,16 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                    
 		else
             # Case 2: Main Video + Logo Video (no client)
-            # Logo is already upscaled to match input_video (1080x1920 @ 30fps)
             CONTENT_DURATION=$VIDEO_DURATION  # Duration that music covers
             TOTAL_DURATION=$((CONTENT_DURATION + LOGO_DURATION))
             
             LOGO_TRANSITION_START=$((CONTENT_DURATION - TRANSITION_DURATION))
             VIDEO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
-            # This is not used in the code
-			# AUDIO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
             
             echo "Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${CONTENT_DURATION}s)"
             
             # Scale and prepare video inputs
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video_raw];"
-            # Logo video is already at correct resolution and fps
             FILTER_COMPLEX+="[1:v]fps=30,setpts=PTS-STARTPTS[logo];"
             
             # Apply fade in to video BEFORE combining with logo (no fade out)

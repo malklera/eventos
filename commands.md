@@ -14,13 +14,13 @@ Cut each video manually and export them to ~/Videos/eventos/name-event/cortado
 ```sh
 $ ./edit.sh -e <event_name> -t "<event_text>" -m <music> -l <logo_video> \
             [-i <client_image>] [-c "<client_text>"] [-C "<client_color>"] \
-            [-T "<text_color>"]
+            [-T "<text_color>"] [-f <font>] [-L <left_icon>] [-R <right_icon>]
 ```
 
 Construct the command here, then copy to the terminal
 
 ```sh
-./edit.sh -e evento5 -t "15 camila" -m music1.mp3 -l logo1.mp4 -i cliente-test.png -c "felices fiestas"
+./edit.sh
 ```
 
 
