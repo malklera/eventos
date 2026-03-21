@@ -33,21 +33,20 @@ TEXT_Y="H-th-20"
 BASE_VIDEOS_DIR="$HOME/Videos/eventos"
 
 # Client image display duration (in seconds)
-CLIENT_TIME=5
+# (Now dynamically set to match logo duration later in the script)
 
 # A helper function to display usage information
 usage() {
-    echo "Usage: $0 -e <event_name> -t \"<event_text>\" -m <music> -l <logo_video> [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
+    echo "Usage: $0 -e <event_name> -m <music> -l <logo_video> [-t \"<event_text>\"] [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
     echo ""
-    echo "  -e, --event        : Name of the event ."
-    echo "                       This is used for directory paths and output filenames."
-    echo "  -t, --text         : Text to overlay on all videos for this event (enclose in quotes if it has spaces)."
-    echo "  -m, --music        : Full path to the background music file (e.g., event_jingle.mp3)."
-    echo "  -i, --image        : (Optional) Full path to client image to display at the beginning (e.g., client_logo.png)."
+    echo "  -e, --event        : Name of the event same name used with ./mkdir <event-name>."
+	echo "  -m, --music        : Partial path to music file (~/Videos/eventos/assets/musica/<your path>)."
+    echo "  -l, --logo         : Partial path to music file (~/Videos/eventos/assets/logo/<your path>)."
+    echo "  -i, --image        : (Optional) Image file name, file has to be inside <event-name>/."
+	echo "  -t, --text         : (Optional) Text to overlay on all videos for this event (enclose in quotes if it has spaces)."
     echo "  -c, --client       : (Optional) Client text to display over client image (enclose in quotes if it has spaces)."
     echo "  -C, --client-color : (Optional) Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
     echo "  -T, --text-color   : (Optional) Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
-    echo "  -l, --logo         : Full path to logo video to display at the end (e.g., logo1.mp4)."
     echo "  -f, --font         : Font filename to use for event text (e.g., MyFont.ttf)."
     echo "  -L, --left         : (Optional) Path to icon image to display to the left of client text."
     echo "  -R, --right        : (Optional) Path to icon image to display to the right of client text."
@@ -115,25 +114,35 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # --- Validate Required Arguments ---
-if [ -z "$EVENT_NAME" ] || [ -z "$EVENT_TEXT" ] || [ -z "$MUSIC" ] || [ -z "$LOGO" ] || [ -z "$FONT" ]; then
-    echo "Error: All required arguments (-e, -t, -m, -l, -f) must be provided."
-    usage
-fi
+# The user will manage what is mandatory.
+# if [ -z "$EVENT_NAME" ] || [ -z "$MUSIC" ] || [ -z "$LOGO" ]; then
+#     echo "Error: All required arguments (-e, -m, -l) must be provided."
+#     usage
+# fi
 
 # --- Construct paths using the event name ---
-CUTTED_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME/cortado"
-EDITADOS_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME/editado"
+if [ -n "$EVENT_NAME" ]; then
+    CUTTED_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME/cortado"
+    EDITED_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME/editado"
+fi
 
-if [ ! -f "$MUSIC" ]; then
+if [ -n "$MUSIC" ] && [ ! -f "$MUSIC" ]; then
     echo "Error: Music file not found at '$MUSIC'"
     exit 1
 fi
-if [ ! -d "$CUTTED_DIR" ]; then
+
+if [ -n "$LOGO" ] && [ ! -f "$LOGO" ]; then
+    echo "Error: Logo video file not found at '$LOGO'"
+    exit 1
+fi
+
+
+if [ -n "$CUTTED_DIR" ] && [ ! -d "$CUTTED_DIR" ]; then
     echo "Error: Manual cuts directory '$CUTTED_DIR' not found."
     echo "Please perform manual cuts in Shotcut first and export videos there."
     exit 1
 fi
-if [ ! -f "$FONT" ]; then
+if [ -n "$FONT" ] && [ ! -f "$FONT" ]; then
     echo "Error: Font file not found at '$FONT'. Please ensure it's installed or provide a correct path."
     echo "You can list available fonts with: fc-list | rg .ttf"
     exit 1
@@ -141,11 +150,6 @@ fi
 
 if [ -n "$CLIENT_IMAGE" ] && [ ! -f "$CLIENT_IMAGE" ]; then
     echo "Error: Client image file not found at '$CLIENT_IMAGE'"
-    exit 1
-fi
-
-if [ ! -f "$LOGO" ]; then
-    echo "Error: Logo video file not found at '$LOGO'"
     exit 1
 fi
 
@@ -177,6 +181,21 @@ fi
 if [ -n "$EVENT_COLOR" ]; then
     FONT_COLOR="$EVENT_COLOR"
 fi
+
+# --- Get Logo Duration and set CLIENT_TIME ---
+if [ -n "$LOGO" ]; then
+    LOGO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$LOGO" | cut -d'.' -f1)
+    if [ -z "$LOGO_DURATION" ]; then
+        echo "Error: Could not determine duration for $LOGO."
+        exit 1
+    fi
+    
+    # Make the CLIENT_TIME as long as the LOGO video
+    CLIENT_TIME=$LOGO_DURATION
+else
+    # Fallback in case LOGO was made optional and not passed
+    CLIENT_TIME=5
+fi
  
 echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
 echo "Text for videos: \"$EVENT_TEXT\""
@@ -194,25 +213,19 @@ if [ -n "$CLIENT_IMAGE" ]; then
     fi
 fi
 echo "Logo video: $LOGO"
-echo "Output to: $EDITADOS_DIR"
+echo "Output to: $EDITED_DIR"
 echo "------------------------------------------------------------------"
 
 processed_count=1
 
-# --- Get Logo Duration if provided ---
-LOGO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$LOGO" | cut -d'.' -f1)
-if [ -z "$LOGO_DURATION" ]; then
-	echo "Error: Could not determine duration for $LOGO."
-	exit 1
-fi
- 
+# (Logo duration is now calculated earlier) 
 # Loop through each .mp4 file from the manually cut videos
 for input_video_path in "$CUTTED_DIR"/*.mp4; do
     if [[ -f "$input_video_path" ]]; then
 
         original_filename=$(basename -- "$input_video_path")
         output_filename="${EVENT_NAME}-${processed_count}.mp4"
-        output_file_path="$EDITADOS_DIR/$output_filename"
+        output_file_path="$EDITED_DIR/$output_filename"
 
         echo "Processing original: $original_filename"
         echo "Input video: $input_video_path"
@@ -229,20 +242,20 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
-            CONTENT_DURATION=$((CLIENT_TIME + VIDEO_DURATION))  # Duration that music covers (client + input_video)
-            TOTAL_DURATION=$((CONTENT_DURATION + LOGO_DURATION))
+            PRE_LOGO_VISUAL_DUR=$((CLIENT_TIME + VIDEO_DURATION - TRANSITION_DURATION))  # Length after first xfade
+            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + LOGO_DURATION - TRANSITION_DURATION))
             
             CLIENT_TRANSITION_START=$((CLIENT_TIME - TRANSITION_DURATION))
-            LOGO_TRANSITION_START=$((CONTENT_DURATION - TRANSITION_DURATION))
+            LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
             # Fades apply only to the content part (client + input_video), not logo
-            VIDEO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
+            VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
             TEXT_FADE_IN_START=$CLIENT_TRANSITION_START
             TEXT_FADE_IN_END=$CLIENT_TIME
             TEXT_FADE_OUT_START=$VIDEO_END_FADE_START
             
-            echo "Client: ${CLIENT_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${CONTENT_DURATION}s)"
+            echo "Client: ${CLIENT_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
             
             # Single-pass approach: client + input_video + logo with transitions
             # Scale and prepare all video inputs
@@ -326,8 +339,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[${CURRENT_STREAM}]null[v_out];"
             
             # Audio: Music fades in, plays through content, acrossfade to logo audio, logo audio fades out at end
-            # Music track: fade in at start, trim to exactly CONTENT_DURATION (no fade out, acrossfade handles transition)
-            FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$CONTENT_DURATION,asetpts=PTS-STARTPTS[music];"
+            # Music track: fade in at start, trim to exactly PRE_LOGO_VISUAL_DUR (no fade out, acrossfade handles transition)
+            FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$PRE_LOGO_VISUAL_DUR,asetpts=PTS-STARTPTS[music];"
             # Acrossfade to logo audio, then fade out at the very end
             LOGO_FADEOUT_START=$((TOTAL_DURATION - TRANSITION_DURATION))
             # shellcheck disable=SC1087
@@ -366,13 +379,13 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                    
 		else
             # Case 2: Main Video + Logo Video (no client)
-            CONTENT_DURATION=$VIDEO_DURATION  # Duration that music covers
-            TOTAL_DURATION=$((CONTENT_DURATION + LOGO_DURATION))
+            PRE_LOGO_VISUAL_DUR=$VIDEO_DURATION  # Duration before logo
+            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + LOGO_DURATION - TRANSITION_DURATION))
             
-            LOGO_TRANSITION_START=$((CONTENT_DURATION - TRANSITION_DURATION))
-            VIDEO_END_FADE_START=$((CONTENT_DURATION - TRANSITION_DURATION))
+            LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
+            VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
-            echo "Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${CONTENT_DURATION}s)"
+            echo "Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
             
             # Scale and prepare video inputs
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video_raw];"
@@ -390,8 +403,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1))'[v_out];"
             
             # Audio: Music fades in, plays through content, acrossfade to logo audio, logo audio fades out at end
-            # Music track: fade in at start, trim to exactly CONTENT_DURATION (no fade out, acrossfade handles transition)
-            FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$CONTENT_DURATION,asetpts=PTS-STARTPTS[music];"
+            # Music track: fade in at start, trim to exactly PRE_LOGO_VISUAL_DUR (no fade out, acrossfade handles transition)
+            FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$PRE_LOGO_VISUAL_DUR,asetpts=PTS-STARTPTS[music];"
             # Acrossfade to logo audio, then fade out at the very end
             LOGO_FADEOUT_START=$((TOTAL_DURATION - TRANSITION_DURATION))
             # shellcheck disable=SC1087
@@ -432,5 +445,5 @@ if [ "$processed_count" -eq 0 ]; then
 else
 	((processed_count--))
     echo "--- All automated conversions complete for event '$EVENT_NAME'! Total files processed: $processed_count ---"
-    echo "Final videos are in: $EDITADOS_DIR"
+    echo "Final videos are in: $EDITED_DIR"
 fi

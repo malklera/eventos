@@ -30,22 +30,18 @@ Put all images into the "catalogo" directory.
 
 ```sh
 cd ~/Videos/eventos/<event-name>/catalogo
-rename -n 's/^([^-]+-[^-]+)-.*/$1.png/' *.png
+perl-rename -n 's/^([^-]+-[^-]+)-.*/$1.png/' *.png
 ```
 
 See the output of that, if it look ok, remove the -n flag
 
 ```sh
-./edit.sh -e <event-name> -t "<event-text>" -m <music> -l <logo-video> \
+./edit.sh -e <event-name> [-t "<event-text>"] -m <music> -l <logo-video> \
             [-i <client-image>] [-c "<client-text>"] [-C "<client-color>"] \
             [-T "<text-color>"] [-f <font>] [-L <left-icon>] [-R <right-icon>]
 ```
 
-Construct the command here, then copy to the terminal
-
-```sh
-./edit.sh
-```
+Construct the command into a edit.txt file on the event-name directory.
 
 
 ---
