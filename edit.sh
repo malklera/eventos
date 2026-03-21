@@ -33,14 +33,13 @@ TEXT_Y="H-th-20"
 BASE_VIDEOS_DIR="$HOME/Videos/eventos"
 
 # Client image display duration (in seconds)
-# (Now dynamically set to match logo duration later in the script)
-
+CLIENT_TIME=5
 # A helper function to display usage information
 usage() {
     echo "Usage: $0 -e <event_name> -m <music> -l <logo_video> [-t \"<event_text>\"] [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
     echo ""
     echo "  -e, --event        : Name of the event same name used with ./mkdir <event-name>."
-	echo "  -m, --music        : Partial path to music file (~/Videos/eventos/assets/musica/<your path>)."
+	echo "  -m, --music        : Partial path to music file (~/Videos/eventos/assets/musica/cortado/<your path>)."
     echo "  -l, --logo         : Partial path to music file (~/Videos/eventos/assets/logo/<your path>)."
     echo "  -i, --image        : (Optional) Image file name, file has to be inside <event-name>/."
 	echo "  -t, --text         : (Optional) Text to overlay on all videos for this event (enclose in quotes if it has spaces)."
@@ -67,7 +66,7 @@ while [[ "$#" -gt 0 ]]; do
             ;;
 
         -m|--music)
-            MUSIC="$BASE_VIDEOS_DIR/assets/musica/$2"
+            MUSIC="$BASE_VIDEOS_DIR/assets/musica/cortado/$2"
             shift # past argument
             ;;
         -i|--image)
@@ -182,19 +181,13 @@ if [ -n "$EVENT_COLOR" ]; then
     FONT_COLOR="$EVENT_COLOR"
 fi
 
-# --- Get Logo Duration and set CLIENT_TIME ---
+# --- Get Logo Duration ---
 if [ -n "$LOGO" ]; then
     LOGO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$LOGO" | cut -d'.' -f1)
     if [ -z "$LOGO_DURATION" ]; then
         echo "Error: Could not determine duration for $LOGO."
         exit 1
     fi
-    
-    # Make the CLIENT_TIME as long as the LOGO video
-    CLIENT_TIME=$LOGO_DURATION
-else
-    # Fallback in case LOGO was made optional and not passed
-    CLIENT_TIME=5
 fi
  
 echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
@@ -267,13 +260,9 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # shellcheck disable=SC1087
             FILTER_COMPLEX+="[client][video]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$CLIENT_TRANSITION_START[client_video_raw];"
             
-            # Apply fade in to content portion (no fade out, to allow xfade to logo)
+            # Second transition: client_video_raw to logo (removed initial fade-in to fix black thumbnail)
             # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[client_video_raw]fade=t=in:st=0:d=$TRANSITION_DURATION[client_video];"
-            
-            # Second transition: faded client_video to logo
-            # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[client_video][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
+            FILTER_COMPLEX+="[client_video_raw][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
             
             # Add event text overlay (text fades in during transition2: client->video xfade)
@@ -290,7 +279,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Add client text overlay if provided (only during client image: 0 to CLIENT_TIME)
             if [ -n "$CLIENT_TEXT" ]; then
                 CLIENT_TEXT_FADE_OUT_START=$CLIENT_TRANSITION_START
-                FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$CLIENT_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0)))'"
+                # Text appears solid immediately to match the image, only fades out
+                FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$CLIENT_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'"
             fi
             
             # Label the output after text overlays
@@ -309,8 +299,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 # Use max(0, ...) to ensure icon stays on screen even if text is wide
                 ICON_LEFT_X="max(0,W/2-$ESTIMATED_TEXT_WIDTH/2-w-$ICON_SPACING)"
                 
-                # Scale icon maintaining aspect ratio, then apply fade in/out to match text timing
-                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
+                # Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
                 # Position left icon to the left of the text
                 # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
                 FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_left_scaled]overlay=x='$ICON_LEFT_X':y='(H-h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_left];"
@@ -327,8 +317,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 # Use min(W-w, ...) to ensure icon stays on screen
                 ICON_RIGHT_X="min(W-w,W/2+$ESTIMATED_TEXT_WIDTH/2+$ICON_SPACING)"
                 
-                # Scale icon maintaining aspect ratio, then apply fade in/out to match text timing
-                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=in:st=0:d=$TRANSITION_DURATION:alpha=1,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
+                # Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
                 # Position right icon to the right of the text
                 # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
                 FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_right_scaled]overlay=x='$ICON_RIGHT_X':y='(H-h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_right];"
@@ -391,16 +381,12 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video_raw];"
             FILTER_COMPLEX+="[1:v]fps=30,setpts=PTS-STARTPTS[logo];"
             
-            # Apply fade in to video BEFORE combining with logo (no fade out)
+            # Transition from input_video to logo (removed initial fade-in to fix black thumbnail)
             # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[video_raw]fade=t=in:st=0:d=$TRANSITION_DURATION[video];"
-            
-            # Transition from input_video to logo
-            # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[video][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
+            FILTER_COMPLEX+="[video_raw][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
             # Add text overlay (text only appears during content portion, not logo)
-            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TRANSITION_DURATION),t/$TRANSITION_DURATION,if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1))'[v_out];"
+            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1)'[v_out];"
             
             # Audio: Music fades in, plays through content, acrossfade to logo audio, logo audio fades out at end
             # Music track: fade in at start, trim to exactly PRE_LOGO_VISUAL_DUR (no fade out, acrossfade handles transition)
