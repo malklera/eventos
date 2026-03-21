@@ -14,10 +14,12 @@ BASE_VIDEOS_DIR="$HOME/Videos/eventos"
 
 # Construct the full paths using the event name
 EVENT_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME"
-ORIGINALES_DIR="$EVENT_DIR/original"
+ORIGINAL_DIR="$EVENT_DIR/original"
 FORMATED_DIR="$EVENT_DIR/formateado"
 CUTTED_DIR="$EVENT_DIR/cortado"
-EDITADOS_DIR="$EVENT_DIR/editado"
+EDITED_DIR="$EVENT_DIR/editado"
+CATALOG_DIR="$EVENT_DIR/catalogo"
+RENAMED_DIR="$EVENT_DIR/renombrado"
 
 # Check if the 'EVENT_NAME' directory exists
 if [ -d "$EVENT_DIR" ]; then
@@ -26,7 +28,9 @@ if [ -d "$EVENT_DIR" ]; then
 fi
 
 mkdir "$EVENT_DIR"
-mkdir "$ORIGINALES_DIR"
+mkdir "$ORIGINAL_DIR"
 mkdir "$FORMATED_DIR"
-mkdir "$EDITADOS_DIR"
+mkdir "$EDITED_DIR"
 mkdir "$CUTTED_DIR"
+mkdir "$CATALOG_DIR"
+mkdir "$RENAMED_DIR"

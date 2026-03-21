@@ -2,7 +2,7 @@
 
 # Check if an event name was provided as an argument
 if [ -z "$1" ]; then
-    echo "Usage: ./ffmpeg-script.sh <event_name>"
+    echo "Usage: ./formater.sh <event_name>"
     exit 1
 fi
 
@@ -10,11 +10,11 @@ fi
 EVENT_NAME="$1"
 
 # Define your base video directory (e.g., ~/Videos)
-BASE_VIDEOS_DIR="$HOME/Videos/eventos"
+BASE_VIDEO_DIR="$HOME/Videos/eventos"
 
 # Construct the full paths using the event name
-EVENT_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME"
-ORIGINALES_DIR="$EVENT_DIR/original"
+EVENT_DIR="$BASE_VIDEO_DIR/$EVENT_NAME"
+RENAMED_DIR="$EVENT_DIR/renombrado"
 FORMATED_DIR="$EVENT_DIR/formateado"
 
 # Check if the 'EVENT_DIR' directory exists
@@ -24,7 +24,7 @@ if [ ! -d "$EVENT_DIR" ]; then
 fi
 
 echo "Starting video conversion for event: '$EVENT_NAME'"
-echo "Source directory: $ORIGINALES_DIR"
+echo "Source directory: $RENAMED_DIR"
 echo "Output directory: $FORMATED_DIR"
 echo "----------------------------------------------------"
 
@@ -32,7 +32,7 @@ echo "----------------------------------------------------"
 processed_count=1
 
 # Loop through each .mp4 file in the originales directory
-for input_file_path in "$ORIGINALES_DIR"/*.mp4; do
+for input_file_path in "$RENAMED_DIR"/*.mp4; do
     # Check if a file was actually found (in case no .mp4 files exist)
     # The glob "$ORIGINALES_DIR"/*.mp4 will expand to itself if no matches,
     # so we need to ensure it's a regular file and not the literal pattern.
@@ -66,7 +66,7 @@ for input_file_path in "$ORIGINALES_DIR"/*.mp4; do
 done
 
 if [ "$processed_count" -eq 0 ]; then
-    echo "No .mp4 files were found or processed in '$ORIGINALES_DIR'."
+    echo "No .mp4 files were found or processed in '$RENAMED_DIR'."
 else
 	((processed_count--))
     echo "All conversions complete for event '$EVENT_NAME'! Total files processed: $processed_count"

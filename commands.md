@@ -1,20 +1,44 @@
+Make Google Drive folder with the event-name, make two folders, "Originales",
+"Editados", upload the "instrucciones.txt" file, copy URL.
+
 ```sh
-$ cd ~/Videos/eventos
-$ ./mkdir.sh name-event
+cd ~/Videos/eventos
+./mkdir.sh <event-name>
 ```
 
-Copy videos from phone to ~/Videos/eventos/name-event/original
+Generate the QR for the event.
 
 ```sh
-$ ./formater.sh name-event
+cd ~/Videos/eventos/event-name
+qrtool encode -o <event-name>.svg -t svg "<link>"
+```
+Copy videos from phone to ~/Videos/eventos/event-name/original
+
+```sh
+./rename.sh <event-name>
 ```
 
-Cut each video manually and export them to ~/Videos/eventos/name-event/cortado
+```sh
+./formater.sh <event-name>
+```
+
+Cut each video manually and export them to ~/Videos/eventos/event-name/cortado
+
+In the process take a screenshot of each for the catalog.
+
+Put all images into the "catalogo" directory.
 
 ```sh
-$ ./edit.sh -e <event_name> -t "<event_text>" -m <music> -l <logo_video> \
-            [-i <client_image>] [-c "<client_text>"] [-C "<client_color>"] \
-            [-T "<text_color>"] [-f <font>] [-L <left_icon>] [-R <right_icon>]
+cd ~/Videos/eventos/<event-name>/catalogo
+rename -n 's/^([^-]+-[^-]+)-.*/$1.png/' *.png
+```
+
+See the output of that, if it look ok, remove the -n flag
+
+```sh
+./edit.sh -e <event-name> -t "<event-text>" -m <music> -l <logo-video> \
+            [-i <client-image>] [-c "<client-text>"] [-C "<client-color>"] \
+            [-T "<text-color>"] [-f <font>] [-L <left-icon>] [-R <right-icon>]
 ```
 
 Construct the command here, then copy to the terminal
