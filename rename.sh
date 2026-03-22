@@ -23,22 +23,21 @@ if [ ! -d "$ORIGINAL_DIR" ]; then
     exit 1
 fi
 
-# Create a new directory for the renamed files to keep originals safe
-mkdir -p "$RENAMED_DIR"
-
 COUNT=1
 
-# Iterate over files sorted by modification time (oldest first: oldest filmed -> first event)
+# Iterate over files sorted by modification time (oldest first: oldest filmed 
+# -> first event)
 # Using ls -tr to sort by time, and while read to handle spaces in filenames
 while IFS= read -r file; do
     # Ensure the file exists (handles the case where no files match the wildcard)
     if [ -f "$file" ]; then
         # Format the new filename (e.g., EventName-1.mp4)
-        new_filename="${EVENT_NAME}-${COUNT}.mp4"
+        new_filename="${COUNT}.mp4"
         
         echo "Copying: '$(basename "$file")' -> '$new_filename'"
         # Using cp -p to copy safely and preserve timestamps. 
-        # If you prefer to move and rename in place to save space, change 'cp -p' to 'mv'
+        # If you prefer to move and rename in place to save space, change 
+		# 'cp -p' to 'mv'
         cp -p "$file" "$RENAMED_DIR/$new_filename"
         
         ((COUNT++))

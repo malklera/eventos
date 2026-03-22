@@ -38,7 +38,7 @@ for input_file_path in "$RENAMED_DIR"/*.mp4; do
     # so we need to ensure it's a regular file and not the literal pattern.
     if [[ -f "$input_file_path" ]]; then
         filename=$(basename -- "$input_file_path")
-        output_file_path="$FORMATED_DIR/${EVENT_NAME}-${processed_count}.mp4"
+        output_file_path="$FORMATED_DIR/${processed_count}.mp4"
 
         echo "Processing: $filename"
         echo "Input: $input_file_path"

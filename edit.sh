@@ -217,7 +217,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
     if [[ -f "$input_video_path" ]]; then
 
         original_filename=$(basename -- "$input_video_path")
-        output_filename="${EVENT_NAME}-${processed_count}.mp4"
+        output_filename="${processed_count}.mp4"
         output_file_path="$EDITED_DIR/$output_filename"
 
         echo "Processing original: $original_filename"
