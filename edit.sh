@@ -182,15 +182,6 @@ if [ -n "$EVENT_COLOR" ]; then
     FONT_COLOR="$EVENT_COLOR"
 fi
 
-# --- Get Logo Duration ---
-if [ -n "$LOGO" ]; then
-    LOGO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$LOGO" | cut -d'.' -f1)
-    if [ -z "$LOGO_DURATION" ]; then
-        echo "Error: Could not determine duration for $LOGO."
-        exit 1
-    fi
-fi
- 
 echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
 echo "Text for videos: \"$EVENT_TEXT\""
 echo "Music: $MUSIC"
@@ -237,7 +228,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
             PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + VIDEO_DURATION - TRANSITION_DURATION))  # Length after first xfade
-            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + LOGO_DURATION - TRANSITION_DURATION))
+            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + IMAGE_TIME - TRANSITION_DURATION))
             
             CLIENT_TRANSITION_START=$((IMAGE_TIME - TRANSITION_DURATION))
             LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
@@ -249,7 +240,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             TEXT_FADE_IN_END=$IMAGE_TIME
             TEXT_FADE_OUT_START=$VIDEO_END_FADE_START
             
-            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
+            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
             
             # Single-pass approach: client + input_video + logo with transitions
             # Scale and prepare all video inputs
@@ -329,19 +320,15 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Set final output stream
             FILTER_COMPLEX+="[${CURRENT_STREAM}]null[v_out];"
             
-            # Audio: Music fades in, plays through content, acrossfade to logo audio, logo audio fades out at end
-            # Music track: fade in at start, trim to exactly PRE_LOGO_VISUAL_DUR (no fade out, acrossfade handles transition)
-            FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$PRE_LOGO_VISUAL_DUR,asetpts=PTS-STARTPTS[music];"
-            # Acrossfade to logo audio, then fade out at the very end
-            LOGO_FADEOUT_START=$((TOTAL_DURATION - TRANSITION_DURATION))
-            # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[music][2:a]acrossfade=d=$TRANSITION_DURATION,afade=t=out:st=$LOGO_FADEOUT_START:d=$TRANSITION_DURATION[a_out]"
+            # Audio: Music covers the full duration (logo is a PNG with no audio)
+            # Fade in at start, trim to total duration, fade out at end
+            FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
             
             # Build ffmpeg command with optional icon inputs
             FFMPEG_CMD="ffmpeg -v warning"
             FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$CLIENT_IMAGE\""
             FFMPEG_CMD+=" -i \"$input_video_path\""
-            FFMPEG_CMD+=" -i \"$LOGO\""
+            FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$LOGO\""
             FFMPEG_CMD+=" -i \"$MUSIC\""
             
             # Add icon inputs if provided (loop them like client image)
@@ -373,12 +360,12 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
 		else
             # Case 2: Main Video + Logo Video (no client)
             PRE_LOGO_VISUAL_DUR=$VIDEO_DURATION  # Duration before logo
-            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + LOGO_DURATION - TRANSITION_DURATION))
+            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + IMAGE_TIME - TRANSITION_DURATION))
             
             LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
-            echo "Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
+            echo "Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
             
             # Scale and prepare video inputs
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video_raw];"
@@ -391,17 +378,13 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Add text overlay (text only appears during content portion, not logo)
             FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1)'[v_out];"
             
-            # Audio: Music fades in, plays through content, acrossfade to logo audio, logo audio fades out at end
-            # Music track: fade in at start, trim to exactly PRE_LOGO_VISUAL_DUR (no fade out, acrossfade handles transition)
-            FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$PRE_LOGO_VISUAL_DUR,asetpts=PTS-STARTPTS[music];"
-            # Acrossfade to logo audio, then fade out at the very end
-            LOGO_FADEOUT_START=$((TOTAL_DURATION - TRANSITION_DURATION))
-            # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[music][1:a]acrossfade=d=$TRANSITION_DURATION,afade=t=out:st=$LOGO_FADEOUT_START:d=$TRANSITION_DURATION[a_out]"
+            # Audio: Music covers the full duration (logo is a PNG with no audio)
+            # Fade in at start, trim to total duration, fade out at end
+            FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
 
             ffmpeg -v warning \
                    -i "$input_video_path" \
-                   -i "$LOGO" \
+                   -loop 1 -t "$IMAGE_TIME" -i "$LOGO" \
                    -i "$MUSIC" \
                    -filter_complex "$FILTER_COMPLEX" \
                    -map "[v_out]" \
