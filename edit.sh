@@ -33,20 +33,21 @@ TEXT_Y="H-th-20"
 BASE_VIDEOS_DIR="$HOME/Videos/eventos"
 
 # Client image display duration (in seconds)
-CLIENT_TIME=5
+IMAGE_TIME=2
+
 # A helper function to display usage information
 usage() {
     echo "Usage: $0 -e <event_name> -m <music> -l <logo_video> [-t \"<event_text>\"] [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
     echo ""
     echo "  -e, --event        : Name of the event same name used with ./mkdir <event-name>."
-	echo "  -m, --music        : Partial path to music file (~/Videos/eventos/assets/musica/cortado/<your path>)."
     echo "  -l, --logo         : Partial path to music file (~/Videos/eventos/assets/logo/<your path>)."
+	echo "  -m, --music        : (Optional) Partial path to music file (~/Videos/eventos/assets/musica/cortado/<your path>)."
     echo "  -i, --image        : (Optional) Image file name, file has to be inside <event-name>/."
 	echo "  -t, --text         : (Optional) Text to overlay on all videos for this event (enclose in quotes if it has spaces)."
     echo "  -c, --client       : (Optional) Client text to display over client image (enclose in quotes if it has spaces)."
     echo "  -C, --client-color : (Optional) Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
     echo "  -T, --text-color   : (Optional) Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
-    echo "  -f, --font         : Font filename to use for event text (e.g., MyFont.ttf)."
+    echo "  -f, --font         : (Optional) Font filename to use for event text (e.g., MyFont.ttf)."
     echo "  -L, --left         : (Optional) Path to icon image to display to the left of client text."
     echo "  -R, --right        : (Optional) Path to icon image to display to the right of client text."
     echo ""
@@ -113,11 +114,11 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # --- Validate Required Arguments ---
-# The user will manage what is mandatory.
-# if [ -z "$EVENT_NAME" ] || [ -z "$MUSIC" ] || [ -z "$LOGO" ]; then
-#     echo "Error: All required arguments (-e, -m, -l) must be provided."
-#     usage
-# fi
+The user will manage what is mandatory.
+if [ -z "$EVENT_NAME" ] || [ -z "$LOGO" ]; then
+    echo "Error: -e <event-name> and -l <path-logo> must be provided."
+    usage
+fi
 
 # --- Construct paths using the event name ---
 if [ -n "$EVENT_NAME" ]; then
@@ -194,7 +195,7 @@ echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
 echo "Text for videos: \"$EVENT_TEXT\""
 echo "Music: $MUSIC"
 if [ -n "$CLIENT_IMAGE" ]; then
-    echo "Client image: $CLIENT_IMAGE (will display for $CLIENT_TIME seconds)"
+    echo "Client image: $CLIENT_IMAGE (will display for $IMAGE_TIME seconds)"
     if [ -n "$CLIENT_TEXT" ]; then
         echo "Client text: \"$CLIENT_TEXT\""
     fi
@@ -235,20 +236,20 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
-            PRE_LOGO_VISUAL_DUR=$((CLIENT_TIME + VIDEO_DURATION - TRANSITION_DURATION))  # Length after first xfade
+            PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + VIDEO_DURATION - TRANSITION_DURATION))  # Length after first xfade
             TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + LOGO_DURATION - TRANSITION_DURATION))
             
-            CLIENT_TRANSITION_START=$((CLIENT_TIME - TRANSITION_DURATION))
+            CLIENT_TRANSITION_START=$((IMAGE_TIME - TRANSITION_DURATION))
             LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
             # Fades apply only to the content part (client + input_video), not logo
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
             TEXT_FADE_IN_START=$CLIENT_TRANSITION_START
-            TEXT_FADE_IN_END=$CLIENT_TIME
+            TEXT_FADE_IN_END=$IMAGE_TIME
             TEXT_FADE_OUT_START=$VIDEO_END_FADE_START
             
-            echo "Client: ${CLIENT_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
+            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${LOGO_DURATION}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
             
             # Single-pass approach: client + input_video + logo with transitions
             # Scale and prepare all video inputs
@@ -280,7 +281,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             if [ -n "$CLIENT_TEXT" ]; then
                 CLIENT_TEXT_FADE_OUT_START=$CLIENT_TRANSITION_START
                 # Text appears solid immediately to match the image, only fades out
-                FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$CLIENT_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'"
+                FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'"
             fi
             
             # Label the output after text overlays
@@ -303,7 +304,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
                 # Position left icon to the left of the text
                 # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
-                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_left_scaled]overlay=x='$ICON_LEFT_X':y='(H-h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_left];"
+                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_left_scaled]overlay=x='$ICON_LEFT_X':y='(H-h)/1.25':enable='between(t,0,$IMAGE_TIME)':format=auto[v_with_left];"
                 CURRENT_STREAM="v_with_left"
                 ((NEXT_INPUT++))
             fi
@@ -321,7 +322,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
                 # Position right icon to the right of the text
                 # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
-                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_right_scaled]overlay=x='$ICON_RIGHT_X':y='(H-h)/1.25':enable='between(t,0,$CLIENT_TIME)':format=auto[v_with_right];"
+                FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_right_scaled]overlay=x='$ICON_RIGHT_X':y='(H-h)/1.25':enable='between(t,0,$IMAGE_TIME)':format=auto[v_with_right];"
                 CURRENT_STREAM="v_with_right"
             fi
             
@@ -338,17 +339,17 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Build ffmpeg command with optional icon inputs
             FFMPEG_CMD="ffmpeg -v warning"
-            FFMPEG_CMD+=" -loop 1 -t \"$CLIENT_TIME\" -i \"$CLIENT_IMAGE\""
+            FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$CLIENT_IMAGE\""
             FFMPEG_CMD+=" -i \"$input_video_path\""
             FFMPEG_CMD+=" -i \"$LOGO\""
             FFMPEG_CMD+=" -i \"$MUSIC\""
             
             # Add icon inputs if provided (loop them like client image)
             if [ -n "$ICON_LEFT" ]; then
-                FFMPEG_CMD+=" -loop 1 -t \"$CLIENT_TIME\" -i \"$ICON_LEFT\""
+                FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$ICON_LEFT\""
             fi
             if [ -n "$ICON_RIGHT" ]; then
-                FFMPEG_CMD+=" -loop 1 -t \"$CLIENT_TIME\" -i \"$ICON_RIGHT\""
+                FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$ICON_RIGHT\""
             fi
             
             FFMPEG_CMD+=" -filter_complex \"$FILTER_COMPLEX\""
