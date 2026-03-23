@@ -322,6 +322,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Audio: Music covers the full duration (logo is a PNG with no audio)
             # Fade in at start, trim to total duration, fade out at end
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
             
             # Build ffmpeg command with optional icon inputs
@@ -380,6 +381,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Audio: Music covers the full duration (logo is a PNG with no audio)
             # Fade in at start, trim to total duration, fade out at end
+            # shellcheck disable=SC1087
             FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
 
             ffmpeg -v warning \
