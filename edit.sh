@@ -217,7 +217,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
     if [[ -f "$input_video_path" ]]; then
 
         original_filename=$(basename -- "$input_video_path")
-        output_filename="${processed_count}.mp4"
+        output_filename="$original_filename"
         output_file_path="$EDITED_DIR/$output_filename"
 
         echo "Processing original: $original_filename"
@@ -356,6 +356,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FFMPEG_CMD+=" -map \"[a_out]\""
             FFMPEG_CMD+=" -t \"$TOTAL_DURATION\""
             FFMPEG_CMD+=" -c:v libx264"
+            FFMPEG_CMD+=" -pix_fmt yuv420p"
+            FFMPEG_CMD+=" -profile:v high"
             FFMPEG_CMD+=" -preset medium"
             FFMPEG_CMD+=" -crf 23"
             FFMPEG_CMD+=" -c:a aac"
@@ -405,6 +407,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                    -map "[a_out]" \
                    -t "$TOTAL_DURATION" \
                    -c:v libx264 \
+                   -pix_fmt yuv420p \
+                   -profile:v high \
                    -preset medium \
                    -crf 23 \
                    -c:a aac \
