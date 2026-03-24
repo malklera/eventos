@@ -325,7 +325,24 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[top_row][bot_row]vstack[quad];"
             
             # Overlay quad on normal video only during Part 2's timeframe (0 to P_LEN)
-            FILTER_COMPLEX+="[pr_main][quad]overlay=enable='between(t,0,$P_LEN)':eof_action=pass[part_rest];"
+            FILTER_COMPLEX+="[pr_main][quad]overlay=enable='between(t,0,$P_LEN)':eof_action=pass[part_rest_step1];"
+            
+            # --- Part 4 Effect: 3x3 grid ---
+            # Part 4 timestamps need to be shifted because part_rest starts at PART2_START
+            P4_LOCAL_START=$(( PART4_START - PART2_START ))
+            P4_LOCAL_END=$(( PART4_END - PART2_START ))
+            THIRD_W=$((VIDEO_WIDTH / 3))
+            THIRD_H=$((VIDEO_HEIGHT / 3))
+            
+            FILTER_COMPLEX+="[part_rest_step1]split=2[pr_step1_main][pr_grid3_src];"
+            FILTER_COMPLEX+="[pr_grid3_src]scale=${THIRD_W}:${THIRD_H},split=9[g1][g2][g3][g4][g5][g6][g7][g8][g9];"
+            FILTER_COMPLEX+="[g1][g2][g3]hstack=inputs=3[row1];"
+            FILTER_COMPLEX+="[g4][g5][g6]hstack=inputs=3[row2];"
+            FILTER_COMPLEX+="[g7][g8][g9]hstack=inputs=3[row3];"
+            FILTER_COMPLEX+="[row1][row2][row3]vstack=inputs=3[grid3];"
+            
+            # Overlay 3x3 grid only during Part 4's explicit timeframe
+            FILTER_COMPLEX+="[pr_step1_main][grid3]overlay=enable='between(t,$P4_LOCAL_START,$P4_LOCAL_END)':eof_action=pass[part_rest];"
             
             # Xfade between Part 1 and Parts 2-5
             XFADE_OFFSET1=$(( PART1_END - TRANSITION_DURATION ))
