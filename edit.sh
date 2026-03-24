@@ -364,7 +364,18 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[row1][row2][row3]vstack=inputs=3[grid3];"
             
             # Overlay 3x3 grid only during Part 4's explicit timeframe
-            FILTER_COMPLEX+="[pr_step3_main][grid3]overlay=enable='between(t,$P4_LOCAL_START,$P4_LOCAL_END)':eof_action=pass[part_rest];"
+            FILTER_COMPLEX+="[pr_step3_main][grid3]overlay=enable='between(t,$P4_LOCAL_START,$P4_LOCAL_END)':eof_action=pass[part_rest_step4];"
+            
+            # --- Part 4 Reverse Boomerang Effect ---
+            # Cut Part 4 in half: play the first half normally, and the first half reversed during the second half
+            P4_LOCAL_MID=$(awk "BEGIN {print $P4_LOCAL_START + ($P4_LOCAL_END - $P4_LOCAL_START) / 2.0}")
+            
+            FILTER_COMPLEX+="[part_rest_step4]split=2[pr_step4_main][p4_to_rev];"
+            # Trim the exact floating-point first half, reverse it, shift PTS to map precisely onto the second half
+            FILTER_COMPLEX+="[p4_to_rev]trim=start=$P4_LOCAL_START:end=$P4_LOCAL_MID,setpts=PTS-STARTPTS,reverse,setpts=PTS+($P4_LOCAL_MID/TB)[p4_rev];"
+            
+            # Overlay reversed snippet safely during the second half, strictly enduring the xfade
+            FILTER_COMPLEX+="[pr_step4_main][p4_rev]overlay=enable='between(t,$P4_LOCAL_MID,$P4_LOCAL_END)':eof_action=pass[part_rest];"
             
             # Xfade 1: Part 1 and Parts 2-4
             XFADE_OFFSET1=$(( PART1_END - TRANSITION_DURATION ))
