@@ -1,4 +1,21 @@
 #!/bin/bash
+#
+# Helper Functions for Logging
+log_info() {
+    echo -e "\e[34m[INFO]\e[0m $1" # Blue
+}
+
+log_success() {
+    echo -e "\e[32m[SUCCESS]\e[0m $1" # Green
+}
+
+log_error() {
+    echo -e "\e[31m[ERROR]\e[0m $1" # Red
+}
+
+log_warning() {
+    echo -e "\e[33m[WARNING]\e[0m $1" # Yellow
+}
 
 # --- Configuration ---
 # Video dimension
@@ -7,7 +24,13 @@ VIDEO_HEIGHT=1920
 
 # Duration of the transition effect in second
 TRANSITION_DURATION=1
- 
+
+# Define your base video directory (e.g., ~/Videos)
+BASE_VIDEOS_DIR="$HOME/Videos/eventos"
+
+# Client image display duration (in seconds)
+IMAGE_TIME=2
+
 # Common text styling
 # Line spacing (pixels between lines)
 LINE_SPACING=10
@@ -28,12 +51,6 @@ CLIENT_TEXT_Y="(h-th)/1.25"
 # Event text styling (appears during filmed video)
 TEXT_X="w-tw-20"
 TEXT_Y="H-th-20"
-
-# Define your base video directory (e.g., ~/Videos)
-BASE_VIDEOS_DIR="$HOME/Videos/eventos"
-
-# Client image display duration (in seconds)
-IMAGE_TIME=2
 
 # A helper function to display usage information
 usage() {
@@ -116,7 +133,7 @@ done
 # --- Validate Required Arguments ---
 The user will manage what is mandatory.
 if [ -z "$EVENT_NAME" ] || [ -z "$LOGO" ]; then
-    echo "Error: -e <event-name> and -l <path-logo> must be provided."
+    log_error "Error: -e <event-name> and -l <path-logo> must be provided."
     usage
 fi
 
@@ -127,47 +144,47 @@ if [ -n "$EVENT_NAME" ]; then
 fi
 
 if [ -n "$MUSIC" ] && [ ! -f "$MUSIC" ]; then
-    echo "Error: Music file not found at '$MUSIC'"
+    log_error "Error: Music file not found at '$MUSIC'"
     exit 1
 fi
 
 if [ -n "$LOGO" ] && [ ! -f "$LOGO" ]; then
-    echo "Error: Logo video file not found at '$LOGO'"
+    log_error "Error: Logo video file not found at '$LOGO'"
     exit 1
 fi
 
 
 if [ -n "$CUTTED_DIR" ] && [ ! -d "$CUTTED_DIR" ]; then
-    echo "Error: Manual cuts directory '$CUTTED_DIR' not found."
-    echo "Please perform manual cuts in Shotcut first and export videos there."
+    log_error "Error: Manual cuts directory '$CUTTED_DIR' not found."
+    log_info "Please perform manual cuts in Shotcut first and export videos there."
     exit 1
 fi
 if [ -n "$FONT" ] && [ ! -f "$FONT" ]; then
-    echo "Error: Font file not found at '$FONT'. Please ensure it's installed or provide a correct path."
-    echo "You can list available fonts with: fc-list | rg .ttf"
+    log_error "Error: Font file not found at '$FONT'. Please ensure it's installed or provide a correct path."
+    log_info "You can list available fonts with: fc-list | rg .ttf"
     exit 1
 fi
 
 if [ -n "$CLIENT_IMAGE" ] && [ ! -f "$CLIENT_IMAGE" ]; then
-    echo "Error: Client image file not found at '$CLIENT_IMAGE'"
+    log_error "Error: Client image file not found at '$CLIENT_IMAGE'"
     exit 1
 fi
 
 if [ -n "$ICON_LEFT" ] && [ ! -f "$ICON_LEFT" ]; then
-    echo "Error: Left icon image file not found at '$ICON_LEFT'"
+    log_error "Error: Left icon image file not found at '$ICON_LEFT'"
     exit 1
 fi
 
 if [ -n "$ICON_RIGHT" ] && [ ! -f "$ICON_RIGHT" ]; then
-    echo "Error: Right icon image file not found at '$ICON_RIGHT'"
+    log_error "Error: Right icon image file not found at '$ICON_RIGHT'"
     exit 1
 fi
 
 # --- Validate Icons vs Client Text dependency ---
 if [ -z "$CLIENT_TEXT" ]; then
     if [ -n "$ICON_LEFT" ] || [ -n "$ICON_RIGHT" ]; then
-        echo "Warning: Icons (--left/-L or --right/-R) were provided but no client text (--client/-c) was specified."
-        echo "Icons will be ignored as they are designed to flank the client text."
+        log_warning "Warning: Icons (--left/-L or --right/-R) were provided but no client text (--client/-c) was specified."
+        log_info "Icons will be ignored as they are designed to flank the client text."
         ICON_LEFT=""
         ICON_RIGHT=""
     fi
@@ -220,8 +237,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         # --- Get Video Duration ---
         VIDEO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$input_video_path" | cut -d'.' -f1)
         if [ -z "$VIDEO_DURATION" ]; then
-            echo "Error: Could not determine duration for $input_video_path. Skipping."
-            continue # Skip to next file
+            log_error "Error: Could not determine duration for $input_video_path. Skipping."
+            continue
         fi
        
         # Determine the structure based on what's provided
@@ -407,17 +424,17 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
 		# I think this is better because of how large the command is
         if [ $? -eq 0 ]; then
 			((processed_count++))
-            echo "Successfully processed '$original_filename' to '$output_filename'"
+            log_success "Successfully processed '$original_filename' to '$output_filename'"
         else
-            echo "Error processing: $original_filename (Check FFmpeg output above)"
+            log_error "Error processing: $original_filename (Check FFmpeg output above)"
         fi
         echo "------------------------------------------------------------------"
     fi
 done
 
 if [ "$processed_count" -eq 0 ]; then
-    echo "No .mp4 files were found or processed in '$CUTTED_DIR'."
-    echo "Ensure you've made the Shotcut manual cuts and saved videos to that directory."
+    log_warning "No .mp4 files were found or processed in '$CUTTED_DIR'."
+    log_info "Ensure you've made the Shotcut manual cuts and saved videos to that directory."
 else
 	((processed_count--))
     echo "--- All automated conversions complete for event '$EVENT_NAME'! Total files processed: $processed_count ---"
