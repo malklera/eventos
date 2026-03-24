@@ -306,14 +306,17 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[video_bg][video]overlay=x=0:y='if(lt(t,$TRANSITION_DURATION),H-H*t/$TRANSITION_DURATION,if(gt(t,$VIDEO_SLIDE_OUT_START),-H*(t-$VIDEO_SLIDE_OUT_START)/$TRANSITION_DURATION,0))':format=auto[video_slide_raw];"
             
             # --- Inner video effects ---
-            # Split the video into Part 1 vs Rest (so we can xfade between them)
-            FILTER_COMPLEX+="[video_slide_raw]split=2[raw1][raw2];"
+            # Split the video into Part 1, Parts 2-4, and Part 5 (for xfades)
+            FILTER_COMPLEX+="[video_slide_raw]split=3[raw1][raw2to4][raw5];"
             
             # Part 1: From the beginning (including slide-up) until PART1_END
             FILTER_COMPLEX+="[raw1]trim=start=0:end=$PART1_END,setpts=PTS-STARTPTS[part1];"
             
-            # Rest (Parts 2-5): Starting from PART2_START
-            FILTER_COMPLEX+="[raw2]trim=start=$PART2_START,setpts=PTS-STARTPTS[part_rest_raw];"
+            # Parts 2-4: Starting from PART2_START until PART4_END
+            FILTER_COMPLEX+="[raw2to4]trim=start=$PART2_START:end=$PART4_END,setpts=PTS-STARTPTS[part_rest_raw];"
+            
+            # Part 5: Starting from PART5_START
+            FILTER_COMPLEX+="[raw5]trim=start=$PART5_START,setpts=PTS-STARTPTS[part5];"
             
             # --- Part 2 Effect: Quad-split (2x2 grid) ---
             HALF_W=$((VIDEO_WIDTH / 2))
@@ -344,9 +347,13 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Overlay 3x3 grid only during Part 4's explicit timeframe
             FILTER_COMPLEX+="[pr_step1_main][grid3]overlay=enable='between(t,$P4_LOCAL_START,$P4_LOCAL_END)':eof_action=pass[part_rest];"
             
-            # Xfade between Part 1 and Parts 2-5
+            # Xfade 1: Part 1 and Parts 2-4
             XFADE_OFFSET1=$(( PART1_END - TRANSITION_DURATION ))
-            FILTER_COMPLEX+="[part1][part_rest]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$XFADE_OFFSET1[video_slide];"
+            FILTER_COMPLEX+="[part1][part_rest]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$XFADE_OFFSET1[video_step1];"
+            
+            # Xfade 2: video_step1 (which ends exactly at PART4_END) and Part 5
+            XFADE_OFFSET2=$(( PART4_END - TRANSITION_DURATION ))
+            FILTER_COMPLEX+="[video_step1][part5]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$XFADE_OFFSET2[video_slide];"
             
             # Concatenate: client (with fade-out) -> main video (with slide-up + quad effect)
             # settb=AVTB normalizes timebase so xfade inputs match
