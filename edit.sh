@@ -264,23 +264,26 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Reusable segment: y = (x - transition_time) / 8, where x = VIDEO_DURATION
             SEGMENT_Y=$(( (VIDEO_DURATION - TRANSITION_DURATION) / 8 ))
             
-            # Divide the inner video into 5 parts, with overlapping bounds to prevent xfade from shrinking the total video
-            USABLE_DUR=$(( VIDEO_DURATION - 2 * TRANSITION_DURATION ))
-            # Accommodate 4 future transitions by adding their overlap times to the pool
-            P_LEN=$(( (USABLE_DUR + 4 * TRANSITION_DURATION) / 5 ))
+            # Divide the inner video into 5 parts.
+            # Since there are only 2 xfades (1->2 and 4->5), we explicitly only overlap those boundaries!
+            P_LEN=$(( VIDEO_DURATION / 5 ))
             
             PART1_START=$TRANSITION_DURATION
             PART1_END=$(( PART1_START + P_LEN ))
             
+            # Xfade 1 setup: Part 2 explicitly overlaps Part 1
             PART2_START=$(( PART1_END - TRANSITION_DURATION ))
             PART2_END=$(( PART2_START + P_LEN ))
             
-            PART3_START=$(( PART2_END - TRANSITION_DURATION ))
+            # No xfade here: Part 3 seamlessly abuts Part 2
+            PART3_START=$PART2_END
             PART3_END=$(( PART3_START + P_LEN ))
             
-            PART4_START=$(( PART3_END - TRANSITION_DURATION ))
+            # No xfade here: Part 4 seamlessly abuts Part 3
+            PART4_START=$PART3_END
             PART4_END=$(( PART4_START + P_LEN ))
             
+            # Xfade 2 setup: Part 5 explicitly overlaps Part 4
             PART5_START=$(( PART4_END - TRANSITION_DURATION ))
             PART5_END=$(( PART5_START + P_LEN ))
             
@@ -330,6 +333,22 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Overlay quad on normal video only during Part 2's timeframe (0 to P_LEN)
             FILTER_COMPLEX+="[pr_main][quad]overlay=enable='between(t,0,$P_LEN)':eof_action=pass[part_rest_step1];"
             
+            # --- Part 3 Effect: Slow/Fast time warp ---
+            # Part 3 plays in slow-motion for the first half, speeding up for the second half
+            P3_LOCAL_START=$(( PART3_START - PART2_START ))
+            P3_LOCAL_END=$(( PART3_END - PART2_START ))
+            
+            FILTER_COMPLEX+="[part_rest_step1]split=2[pr_step2_main][p3_src];"
+            FILTER_COMPLEX+="[p3_src]trim=start=$P3_LOCAL_START:end=$P3_LOCAL_END,setpts=PTS-STARTPTS[p3_trim];"
+            
+            # T is current time in seconds. First 1/4 of source duration plays at 0.5x speed (takes 1/2 of output P_LEN).
+            # Remaining 3/4 plays at 1.5x speed (takes remaining 1/2 of output P_LEN).
+            # PTS mapping securely warps timestamps precisely to fit exactly within P_LEN without breaking overlaps!
+            FILTER_COMPLEX+="[p3_trim]setpts='if(lt(T, $P_LEN/4), 2*PTS + $P3_LOCAL_START/TB, (2/3)*PTS + ($P_LEN/3 + $P3_LOCAL_START)/TB)'[p3_warp];"
+            
+            # Overlay exactly during Part 3's timeframe
+            FILTER_COMPLEX+="[pr_step2_main][p3_warp]overlay=enable='between(t,$P3_LOCAL_START,$P3_LOCAL_END)':eof_action=pass[part_rest_step2];"
+            
             # --- Part 4 Effect: 3x3 grid ---
             # Part 4 timestamps need to be shifted because part_rest starts at PART2_START
             P4_LOCAL_START=$(( PART4_START - PART2_START ))
@@ -337,7 +356,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             THIRD_W=$((VIDEO_WIDTH / 3))
             THIRD_H=$((VIDEO_HEIGHT / 3))
             
-            FILTER_COMPLEX+="[part_rest_step1]split=2[pr_step1_main][pr_grid3_src];"
+            FILTER_COMPLEX+="[part_rest_step2]split=2[pr_step3_main][pr_grid3_src];"
             FILTER_COMPLEX+="[pr_grid3_src]scale=${THIRD_W}:${THIRD_H},split=9[g1][g2][g3][g4][g5][g6][g7][g8][g9];"
             FILTER_COMPLEX+="[g1][g2][g3]hstack=inputs=3[row1];"
             FILTER_COMPLEX+="[g4][g5][g6]hstack=inputs=3[row2];"
@@ -345,7 +364,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[row1][row2][row3]vstack=inputs=3[grid3];"
             
             # Overlay 3x3 grid only during Part 4's explicit timeframe
-            FILTER_COMPLEX+="[pr_step1_main][grid3]overlay=enable='between(t,$P4_LOCAL_START,$P4_LOCAL_END)':eof_action=pass[part_rest];"
+            FILTER_COMPLEX+="[pr_step3_main][grid3]overlay=enable='between(t,$P4_LOCAL_START,$P4_LOCAL_END)':eof_action=pass[part_rest];"
             
             # Xfade 1: Part 1 and Parts 2-4
             XFADE_OFFSET1=$(( PART1_END - TRANSITION_DURATION ))
