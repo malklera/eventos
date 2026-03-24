@@ -357,6 +357,14 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Overlay exactly during Part 3's timeframe
             FILTER_COMPLEX+="[pr_step2_main][p3_warp]overlay=enable='between(t,$P3_LOCAL_START,$P3_LOCAL_END)':eof_action=pass[part_rest_step2];"
             
+            # --- Transition: Spin effect between Part 3 and Part 4 ---
+            # Creates a fast 360-degree dizzy spin precisely across the explicit frame cut boundary
+            SPIN_START=$(awk "BEGIN {print $P_LEN * 2 - $TRANSITION_DURATION / 2.0}")
+            SPIN_END=$(awk "BEGIN {print $P_LEN * 2 + $TRANSITION_DURATION / 2.0}")
+            
+            # Spins dynamically reaching exactly 2*PI (a full 360 circle) completing squarely normalizing back to 0
+            FILTER_COMPLEX+="[part_rest_step2]rotate=a='if(between(t,$SPIN_START,$SPIN_END), 2*PI*(t-$SPIN_START)/$TRANSITION_DURATION, 0)':ow=iw:oh=ih:c=black[part_rest_step25];"
+            
             # --- Part 4 Effect: 3x3 grid ---
             # Part 4 timestamps need to be shifted because part_rest starts at PART2_START
             P4_LOCAL_START=$(( PART4_START - PART2_START ))
@@ -364,7 +372,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             THIRD_W=$((VIDEO_WIDTH / 3))
             THIRD_H=$((VIDEO_HEIGHT / 3))
             
-            FILTER_COMPLEX+="[part_rest_step2]split=2[pr_step3_main][pr_grid3_src];"
+            FILTER_COMPLEX+="[part_rest_step25]split=2[pr_step3_main][pr_grid3_src];"
             FILTER_COMPLEX+="[pr_grid3_src]scale=${THIRD_W}:${THIRD_H},split=9[g1][g2][g3][g4][g5][g6][g7][g8][g9];"
             FILTER_COMPLEX+="[g1][g2][g3]hstack=inputs=3[row1];"
             FILTER_COMPLEX+="[g4][g5][g6]hstack=inputs=3[row2];"
