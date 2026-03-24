@@ -264,23 +264,24 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Reusable segment: y = (x - transition_time) / 8, where x = VIDEO_DURATION
             SEGMENT_Y=$(( (VIDEO_DURATION - TRANSITION_DURATION) / 8 ))
             
-            # Divide the inner video (between slide-up and slide-out) into 5 parts
+            # Divide the inner video into 5 parts, with overlapping bounds to prevent xfade from shrinking the total video
             USABLE_DUR=$(( VIDEO_DURATION - 2 * TRANSITION_DURATION ))
-            P_LEN=$(( USABLE_DUR / 5 ))
+            # Accommodate 4 future transitions by adding their overlap times to the pool
+            P_LEN=$(( (USABLE_DUR + 4 * TRANSITION_DURATION) / 5 ))
             
             PART1_START=$TRANSITION_DURATION
             PART1_END=$(( PART1_START + P_LEN ))
             
-            PART2_START=$PART1_END
+            PART2_START=$(( PART1_END - TRANSITION_DURATION ))
             PART2_END=$(( PART2_START + P_LEN ))
             
-            PART3_START=$PART2_END
+            PART3_START=$(( PART2_END - TRANSITION_DURATION ))
             PART3_END=$(( PART3_START + P_LEN ))
             
-            PART4_START=$PART3_END
+            PART4_START=$(( PART3_END - TRANSITION_DURATION ))
             PART4_END=$(( PART4_START + P_LEN ))
             
-            PART5_START=$PART4_END
+            PART5_START=$(( PART4_END - TRANSITION_DURATION ))
             PART5_END=$(( PART5_START + P_LEN ))
             
             # Event text appears when main video starts (after client)
@@ -304,8 +305,31 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="color=c=black:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=${VIDEO_DURATION}:r=30[video_bg];"
             FILTER_COMPLEX+="[video_bg][video]overlay=x=0:y='if(lt(t,$TRANSITION_DURATION),H-H*t/$TRANSITION_DURATION,if(gt(t,$VIDEO_SLIDE_OUT_START),-H*(t-$VIDEO_SLIDE_OUT_START)/$TRANSITION_DURATION,0))':format=auto[video_slide_raw];"
             
-            # Inner video effects will go here. Currently just passing it through.
-            FILTER_COMPLEX+="[video_slide_raw]null[video_slide];"
+            # --- Inner video effects ---
+            # Split the video into Part 1 vs Rest (so we can xfade between them)
+            FILTER_COMPLEX+="[video_slide_raw]split=2[raw1][raw2];"
+            
+            # Part 1: From the beginning (including slide-up) until PART1_END
+            FILTER_COMPLEX+="[raw1]trim=start=0:end=$PART1_END,setpts=PTS-STARTPTS[part1];"
+            
+            # Rest (Parts 2-5): Starting from PART2_START
+            FILTER_COMPLEX+="[raw2]trim=start=$PART2_START,setpts=PTS-STARTPTS[part_rest_raw];"
+            
+            # --- Part 2 Effect: Quad-split (2x2 grid) ---
+            HALF_W=$((VIDEO_WIDTH / 2))
+            HALF_H=$((VIDEO_HEIGHT / 2))
+            FILTER_COMPLEX+="[part_rest_raw]split=2[pr_main][pr_quad_src];"
+            FILTER_COMPLEX+="[pr_quad_src]scale=${HALF_W}:${HALF_H},split=4[q1][q2][q3][q4];"
+            FILTER_COMPLEX+="[q1][q2]hstack[top_row];"
+            FILTER_COMPLEX+="[q3][q4]hstack[bot_row];"
+            FILTER_COMPLEX+="[top_row][bot_row]vstack[quad];"
+            
+            # Overlay quad on normal video only during Part 2's timeframe (0 to P_LEN)
+            FILTER_COMPLEX+="[pr_main][quad]overlay=enable='between(t,0,$P_LEN)':eof_action=pass[part_rest];"
+            
+            # Xfade between Part 1 and Parts 2-5
+            XFADE_OFFSET1=$(( PART1_END - TRANSITION_DURATION ))
+            FILTER_COMPLEX+="[part1][part_rest]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$XFADE_OFFSET1[video_slide];"
             
             # Concatenate: client (with fade-out) -> main video (with slide-up + quad effect)
             # settb=AVTB normalizes timebase so xfade inputs match
