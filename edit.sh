@@ -275,9 +275,13 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[1:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video];"
             FILTER_COMPLEX+="[2:v]fps=30,setpts=PTS-STARTPTS,settb=AVTB[logo];"
             
-            # Concatenate: client (with fade-out) -> main video (appears immediately)
+            # Slide-up entrance for main video: video moves from bottom to top over TRANSITION_DURATION
+            FILTER_COMPLEX+="color=c=black:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=${VIDEO_DURATION}:r=30[video_bg];"
+            FILTER_COMPLEX+="[video_bg][video]overlay=x=0:y='if(lt(t,$TRANSITION_DURATION),H-H*t/$TRANSITION_DURATION,0)':format=auto[video_slide];"
+            
+            # Concatenate: client (with fade-out) -> main video (slides up from bottom)
             # settb=AVTB normalizes timebase so xfade inputs match
-            FILTER_COMPLEX+="[client][video]concat=n=2:v=1:a=0,settb=AVTB[client_video_raw];"
+            FILTER_COMPLEX+="[client][video_slide]concat=n=2:v=1:a=0,settb=AVTB[client_video_raw];"
             
             # Second transition: client_video_raw to logo (xfade remains)
             # shellcheck disable=SC1087
