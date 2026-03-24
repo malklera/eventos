@@ -57,9 +57,9 @@ usage() {
     echo "Usage: $0 -e <event_name> -m <music> -l <logo_video> [-t \"<event_text>\"] [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
     echo ""
     echo "  -e, --event        : Name of the event same name used with ./mkdir <event-name>."
-    echo "  -l, --logo         : Partial path to music file (~/Videos/eventos/assets/logo/<your path>)."
+    echo "  -l, --logo         : Partial path to logo image file (~/Videos/eventos/assets/logo/<your path>)."
 	echo "  -m, --music        : (Optional) Partial path to music file (~/Videos/eventos/assets/musica/cortado/<your path>)."
-    echo "  -i, --image        : (Optional) Image file name, file has to be inside <event-name>/."
+    echo "  -i, --image        : (Optional) Client image file name, file has to be inside <event-name>/."
 	echo "  -t, --text         : (Optional) Text to overlay on all videos for this event (enclose in quotes if it has spaces)."
     echo "  -c, --client       : (Optional) Client text to display over client image (enclose in quotes if it has spaces)."
     echo "  -C, --client-color : (Optional) Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
@@ -131,7 +131,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # --- Validate Required Arguments ---
-The user will manage what is mandatory.
+# The user will manage what is mandatory.
 if [ -z "$EVENT_NAME" ] || [ -z "$LOGO" ]; then
     log_error "Error: -e <event-name> and -l <path-logo> must be provided."
     usage
@@ -240,7 +240,9 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             log_error "Error: Could not determine duration for $input_video_path. Skipping."
             continue
         fi
-       
+
+        # Check if the video has an audio stream
+        HAS_AUDIO=$(ffprobe -v error -select_streams a -show_entries stream=index -of default=noprint_wrappers=1:nokey=1 "$input_video_path")
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
@@ -257,7 +259,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             TEXT_FADE_IN_END=$IMAGE_TIME
             TEXT_FADE_OUT_START=$VIDEO_END_FADE_START
             
-            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
+            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${TOTAL_DURATION}s)"
             
             # Single-pass approach: client + input_video + logo with transitions
             # Scale and prepare all video inputs
@@ -295,9 +297,26 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Label the output after text overlays
             FILTER_COMPLEX+="[v_with_text];"
             
-            # Determine the next input index based on what icons are provided
-            NEXT_INPUT=4  # Start after [3:a] (music)
+            # Identify the audio source and handle optional music/video audio
             CURRENT_STREAM="v_with_text"
+            if [ -n "$MUSIC" ]; then
+                # Music covers the full duration
+                # shellcheck disable=SC1087
+                FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out];"
+                NEXT_INPUT=4 # Icons start after [3:a]
+            elif [ -n "$HAS_AUDIO" ]; then
+                # No music, use video audio [1:a]
+                # Delay it to match video start (IMAGE_TIME - TRANSITION_DURATION)
+                DELAY_MS=$(( (IMAGE_TIME - TRANSITION_DURATION) * 1000 ))
+                if [ $DELAY_MS -lt 0 ]; then DELAY_MS=0; fi
+                # shellcheck disable=SC1087
+                FILTER_COMPLEX+="[1:a]adelay=${DELAY_MS}|${DELAY_MS},atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out];"
+                NEXT_INPUT=3 # Icons start after [2:v] (logo)
+            else
+                # No music and no video audio, generate silence to prevent ffmpeg crash
+                FILTER_COMPLEX+="anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS[a_out];"
+                NEXT_INPUT=3 # Icons start after [2:v] (logo)
+            fi
             
             # Add left icon overlay if provided
             if [ -n "$ICON_LEFT" ]; then
@@ -335,19 +354,17 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             fi
             
             # Set final output stream
-            FILTER_COMPLEX+="[${CURRENT_STREAM}]null[v_out];"
-            
-            # Audio: Music covers the full duration (logo is a PNG with no audio)
-            # Fade in at start, trim to total duration, fade out at end
-            # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
+            FILTER_COMPLEX+="[${CURRENT_STREAM}]null[v_out]"
             
             # Build ffmpeg command with optional icon inputs
             FFMPEG_CMD="ffmpeg -v warning"
             FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$CLIENT_IMAGE\""
             FFMPEG_CMD+=" -i \"$input_video_path\""
             FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$LOGO\""
-            FFMPEG_CMD+=" -i \"$MUSIC\""
+            
+            if [ -n "$MUSIC" ]; then
+                FFMPEG_CMD+=" -i \"$MUSIC\""
+            fi
             
             # Add icon inputs if provided (loop them like client image)
             if [ -n "$ICON_LEFT" ]; then
@@ -374,8 +391,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Execute the command
             eval "$FFMPEG_CMD"
-                   
-		else
+            FFMPEG_EXIT_CODE=$?
+        else
             # Case 2: Main Video + Logo Video (no client)
             PRE_LOGO_VISUAL_DUR=$VIDEO_DURATION  # Duration before logo
             TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + IMAGE_TIME - TRANSITION_DURATION))
@@ -383,46 +400,59 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
-            echo "Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${PRE_LOGO_VISUAL_DUR}s)"
+            echo "Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${TOTAL_DURATION}s)"
             
             # Scale and prepare video inputs
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video_raw];"
             FILTER_COMPLEX+="[1:v]fps=30,setpts=PTS-STARTPTS[logo];"
             
-            # Transition from input_video to logo (removed initial fade-in to fix black thumbnail)
+            # Transition from input_video to logo
             # shellcheck disable=SC1087
             FILTER_COMPLEX+="[video_raw][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
-            # Add text overlay (text only appears during content portion, not logo)
+            # Add text overlay
             FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1)'[v_out];"
             
-            # Audio: Music covers the full duration (logo is a PNG with no audio)
-            # Fade in at start, trim to total duration, fade out at end
-            # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
+            # Audio: Handle optional music and silent videos
+            if [ -n "$MUSIC" ]; then
+                # shellcheck disable=SC1087
+                FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
+            elif [ -n "$HAS_AUDIO" ]; then
+                # No music, use video audio [0:a]
+                # shellcheck disable=SC1087
+                FILTER_COMPLEX+="[0:a]atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
+            else
+                # No music and no video audio, generate silence
+                FILTER_COMPLEX+="anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS[a_out]"
+            fi
 
-            ffmpeg -v warning \
-                   -i "$input_video_path" \
-                   -loop 1 -t "$IMAGE_TIME" -i "$LOGO" \
-                   -i "$MUSIC" \
-                   -filter_complex "$FILTER_COMPLEX" \
-                   -map "[v_out]" \
-                   -map "[a_out]" \
-                   -t "$TOTAL_DURATION" \
-                   -c:v libx264 \
-                   -pix_fmt yuv420p \
-                   -profile:v high \
-                   -preset medium \
-                   -crf 23 \
-                   -c:a aac \
-                   -b:a 192k \
-                   -movflags +faststart \
-                   -f mp4 \
-                   "$output_file_path"
+            FFMPEG_CMD="ffmpeg -v warning"
+            FFMPEG_CMD+=" -i \"$input_video_path\""
+            FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$LOGO\""
+            if [ -n "$MUSIC" ]; then
+                FFMPEG_CMD+=" -i \"$MUSIC\""
+            fi
+            FFMPEG_CMD+=" -filter_complex \"$FILTER_COMPLEX\""
+            FFMPEG_CMD+=" -map \"[v_out]\""
+            FFMPEG_CMD+=" -map \"[a_out]\""
+            FFMPEG_CMD+=" -t \"$TOTAL_DURATION\""
+            FFMPEG_CMD+=" -c:v libx264"
+            FFMPEG_CMD+=" -pix_fmt yuv420p"
+            FFMPEG_CMD+=" -profile:v high"
+            FFMPEG_CMD+=" -preset medium"
+            FFMPEG_CMD+=" -crf 23"
+            FFMPEG_CMD+=" -c:a aac"
+            FFMPEG_CMD+=" -b:a 192k"
+            FFMPEG_CMD+=" -movflags +faststart"
+            FFMPEG_CMD+=" -f mp4"
+            FFMPEG_CMD+=" \"$output_file_path\""
+
+            eval "$FFMPEG_CMD"
+            FFMPEG_EXIT_CODE=$?
         fi
 
 		# I think this is better because of how large the command is
-        if [ $? -eq 0 ]; then
+        if [ $FFMPEG_EXIT_CODE -eq 0 ]; then
 			((processed_count++))
             log_success "Successfully processed '$original_filename' to '$output_filename'"
         else
