@@ -264,28 +264,27 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Reusable segment: y = (x - transition_time) / 8, where x = VIDEO_DURATION
             SEGMENT_Y=$(( (VIDEO_DURATION - TRANSITION_DURATION) / 8 ))
             
-            # Divide the inner video into 5 parts.
-            # Since there are only 2 xfades (1->2 and 4->5), we explicitly only overlap those boundaries!
-            P_LEN=$(( VIDEO_DURATION / 5 ))
+            # Divide the entire video duration (including intro/outro transitions) into 5 parts.
+            # We add 2 * TRANSITION_DURATION to the total pool to account for the 2 xfade overlaps.
+            P_LEN=$(awk "BEGIN {print ($VIDEO_DURATION + 2 * $TRANSITION_DURATION) / 5.0}")
             
-            PART1_START=$TRANSITION_DURATION
-            PART1_END=$(( PART1_START + P_LEN ))
+            PART1_START=0
+            PART1_END=$P_LEN
             
-            # Xfade 1 setup: Part 2 explicitly overlaps Part 1
-            PART2_START=$(( PART1_END - TRANSITION_DURATION ))
-            PART2_END=$(( PART2_START + P_LEN ))
+            # Xfade 1 setup: Part 1 and Part 2 overlap by TRANSITION_DURATION
+            PART2_START=$(awk "BEGIN {print $PART1_END - $TRANSITION_DURATION}")
+            PART2_END=$(awk "BEGIN {print $PART2_START + $P_LEN}")
             
-            # No xfade here: Part 3 seamlessly abuts Part 2
+            # Parts 2, 3, and 4 abut each other sequentially
             PART3_START=$PART2_END
-            PART3_END=$(( PART3_START + P_LEN ))
+            PART3_END=$(awk "BEGIN {print $PART3_START + $P_LEN}")
             
-            # No xfade here: Part 4 seamlessly abuts Part 3
             PART4_START=$PART3_END
-            PART4_END=$(( PART4_START + P_LEN ))
+            PART4_END=$(awk "BEGIN {print $PART4_START + $P_LEN}")
             
-            # Xfade 2 setup: Part 5 explicitly overlaps Part 4
-            PART5_START=$(( PART4_END - TRANSITION_DURATION ))
-            PART5_END=$(( PART5_START + P_LEN ))
+            # Xfade 2 setup: Part 4 and Part 5 overlap by TRANSITION_DURATION
+            PART5_START=$(awk "BEGIN {print $PART4_END - $TRANSITION_DURATION}")
+            PART5_END=$VIDEO_DURATION  # Should be exactly PART5_START + P_LEN if math is perfect
             
             # Event text appears when main video starts (after client)
             TEXT_FADE_IN_START=$((IMAGE_TIME - TRANSITION_DURATION))
@@ -343,8 +342,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # --- Part 3 Effect: Slow/Fast time warp ---
             # Part 3 plays in slow-motion for the first half, speeding up for the second half
-            P3_LOCAL_START=$(( PART3_START - PART2_START ))
-            P3_LOCAL_END=$(( PART3_END - PART2_START ))
+            P3_LOCAL_START=$(awk "BEGIN {print $PART3_START - $PART2_START}")
+            P3_LOCAL_END=$(awk "BEGIN {print $PART3_END - $PART2_START}")
             
             FILTER_COMPLEX+="[part_rest_step15]split=2[pr_step2_main][p3_src];"
             FILTER_COMPLEX+="[p3_src]trim=start=$P3_LOCAL_START:end=$P3_LOCAL_END,setpts=PTS-STARTPTS[p3_trim];"
@@ -367,8 +366,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # --- Part 4 Effect: 3x3 grid ---
             # Part 4 timestamps need to be shifted because part_rest starts at PART2_START
-            P4_LOCAL_START=$(( PART4_START - PART2_START ))
-            P4_LOCAL_END=$(( PART4_END - PART2_START ))
+            P4_LOCAL_START=$(awk "BEGIN {print $PART4_START - $PART2_START}")
+            P4_LOCAL_END=$(awk "BEGIN {print $PART4_END - $PART2_START}")
             THIRD_W=$((VIDEO_WIDTH / 3))
             THIRD_H=$((VIDEO_HEIGHT / 3))
             
@@ -394,11 +393,11 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[pr_step4_main][p4_rev]overlay=enable='between(t,$P4_LOCAL_MID,$P4_LOCAL_END)':eof_action=pass[part_rest];"
             
             # Xfade 1: Part 1 and Parts 2-4
-            XFADE_OFFSET1=$(( PART1_END - TRANSITION_DURATION ))
+            XFADE_OFFSET1=$(awk "BEGIN {print $PART1_END - $TRANSITION_DURATION}")
             FILTER_COMPLEX+="[part1][part_rest]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$XFADE_OFFSET1[video_step1];"
             
             # Xfade 2: video_step1 (which ends exactly at PART4_END) and Part 5
-            XFADE_OFFSET2=$(( PART4_END - TRANSITION_DURATION ))
+            XFADE_OFFSET2=$(awk "BEGIN {print $PART4_END - $TRANSITION_DURATION}")
             FILTER_COMPLEX+="[video_step1][part5]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$XFADE_OFFSET2[video_slide];"
             
             # Concatenate: client (with fade-out) -> main video (with slide-up + quad effect)
