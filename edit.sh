@@ -266,7 +266,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Quad-split effect timing (in video-local time)
             THIRD=$((VIDEO_DURATION / 3))
-            QUAD1_START=$TRANSITION_DURATION
+            QUAD1_START=$((2 * TRANSITION_DURATION))
             QUAD1_END=$((QUAD1_START + THIRD))
             QUAD2_START=$((QUAD1_END + THIRD - 2 * TRANSITION_DURATION))
             QUAD2_END=$((QUAD2_START + THIRD))
