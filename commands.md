@@ -1,34 +1,4 @@
-[14:24, 23/3/2026] Mamá Claro Particular: Video
-Foto principal 2/3 segundos.
-Video central 15 segundos.
-Transiciones... hacia adelante, lento y acelerar, transición rápida a efecto pantalla partida en 4 por 3/4 Segundos
-Transición corta 1 segundo. 
-Reversa
-Efecto pin pong
-[14:25, 23/3/2026] Mamá Claro Particular: Foto final de institucional
-
-Video total
-
-Imagen-Cliente+Transicion-crossfade(imagen cliente transparenta y se ve el video)+Video-plataforma+Transicion-crossfade+Imagen-Mimbi
-
-Musica
-
-Fade-In+                                                                                                                        +Fade-out
-
-Video plataforma
-
-Static client-imagen: IMAGE_TIME
-Fade-out transition: TRANSITION_DURATION
-transicion abajo hacia arriba: overlay, from bottom to top, input_video_path
-
-hacia adelante: 
-
-"lento y acelerar" video y audio o solo video?
-slow/fast motion: minterpolate, mci
-
-efecto pantalla partida en 4: xstack
-
-Reversa: 
+./edit.sh -e prueba -l contact.png -i logo.png -m electronica/'Storm - Chela Rivas.opus'
 
 Make Google Drive folder with the event-name, make two folders, "Originales",
 "Editados", upload the "instrucciones.txt" file, copy URL.

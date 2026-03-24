@@ -264,12 +264,24 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Reusable segment: y = (x - transition_time) / 8, where x = VIDEO_DURATION
             SEGMENT_Y=$(( (VIDEO_DURATION - TRANSITION_DURATION) / 8 ))
             
-            # Quad-split effect timing (in video-local time)
-            THIRD=$((VIDEO_DURATION / 3))
-            QUAD1_START=$((2 * TRANSITION_DURATION))
-            QUAD1_END=$((QUAD1_START + THIRD))
-            QUAD2_START=$((QUAD1_END + THIRD - 2 * TRANSITION_DURATION))
-            QUAD2_END=$((QUAD2_START + THIRD))
+            # Divide the inner video (between slide-up and slide-out) into 5 parts
+            USABLE_DUR=$(( VIDEO_DURATION - 2 * TRANSITION_DURATION ))
+            P_LEN=$(( USABLE_DUR / 5 ))
+            
+            PART1_START=$TRANSITION_DURATION
+            PART1_END=$(( PART1_START + P_LEN ))
+            
+            PART2_START=$PART1_END
+            PART2_END=$(( PART2_START + P_LEN ))
+            
+            PART3_START=$PART2_END
+            PART3_END=$(( PART3_START + P_LEN ))
+            
+            PART4_START=$PART3_END
+            PART4_END=$(( PART4_START + P_LEN ))
+            
+            PART5_START=$PART4_END
+            PART5_END=$(( PART5_START + P_LEN ))
             
             # Event text appears when main video starts (after client)
             TEXT_FADE_IN_START=$((IMAGE_TIME - TRANSITION_DURATION))
@@ -292,16 +304,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="color=c=black:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=${VIDEO_DURATION}:r=30[video_bg];"
             FILTER_COMPLEX+="[video_bg][video]overlay=x=0:y='if(lt(t,$TRANSITION_DURATION),H-H*t/$TRANSITION_DURATION,if(gt(t,$VIDEO_SLIDE_OUT_START),-H*(t-$VIDEO_SLIDE_OUT_START)/$TRANSITION_DURATION,0))':format=auto[video_slide_raw];"
             
-            # Quad-split effect: 2x2 grid of the same video during quad phases
-            HALF_W=$((VIDEO_WIDTH / 2))
-            HALF_H=$((VIDEO_HEIGHT / 2))
-            FILTER_COMPLEX+="[video_slide_raw]split=2[vs_main][vs_quad_src];"
-            FILTER_COMPLEX+="[vs_quad_src]scale=${HALF_W}:${HALF_H},split=4[q1][q2][q3][q4];"
-            FILTER_COMPLEX+="[q1][q2]hstack[top_row];"
-            FILTER_COMPLEX+="[q3][q4]hstack[bot_row];"
-            FILTER_COMPLEX+="[top_row][bot_row]vstack[quad];"
-            # Overlay quad on normal video during phase 1 and phase 3
-            FILTER_COMPLEX+="[vs_main][quad]overlay=enable='between(t,$QUAD1_START,$QUAD1_END)+between(t,$QUAD2_START,$QUAD2_END)':shortest=1[video_slide];"
+            # Inner video effects will go here. Currently just passing it through.
+            FILTER_COMPLEX+="[video_slide_raw]null[video_slide];"
             
             # Concatenate: client (with fade-out) -> main video (with slide-up + quad effect)
             # settb=AVTB normalizes timebase so xfade inputs match
