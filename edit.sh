@@ -31,6 +31,9 @@ BASE_VIDEOS_DIR="$HOME/Videos/eventos"
 # Client image display duration (in seconds)
 IMAGE_TIME=2
 
+# Duration of the black gap between client image fade-out and main video (in seconds)
+BLACK_DURATION=1
+
 # Common text styling
 # Line spacing (pixels between lines)
 LINE_SPACING=10
@@ -250,32 +253,39 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
-            PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + VIDEO_DURATION - TRANSITION_DURATION))  # Length after first xfade
+            # Timeline: client(IMAGE_TIME) -> fade-out(within IMAGE_TIME) -> black(BLACK_DURATION) -> video(VIDEO_DURATION) -> xfade -> logo(IMAGE_TIME)
+            PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + BLACK_DURATION + VIDEO_DURATION))  # Total before logo xfade
             TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + IMAGE_TIME - TRANSITION_DURATION))
             
-            CLIENT_TRANSITION_START=$((IMAGE_TIME - TRANSITION_DURATION))
+            CLIENT_FADE_OUT_START=$((IMAGE_TIME - TRANSITION_DURATION))
             LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
             # Fades apply only to the content part (client + input_video), not logo
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
-            TEXT_FADE_IN_START=$CLIENT_TRANSITION_START
-            TEXT_FADE_IN_END=$IMAGE_TIME
+            # Event text appears when main video starts (after client + black)
+            VIDEO_START_TIME=$((IMAGE_TIME + BLACK_DURATION))
+            TEXT_FADE_IN_START=$((VIDEO_START_TIME - TRANSITION_DURATION))
+            TEXT_FADE_IN_END=$VIDEO_START_TIME
             TEXT_FADE_OUT_START=$VIDEO_END_FADE_START
             
-            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s"
+            echo "Client: ${IMAGE_TIME}s, Black: ${BLACK_DURATION}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s"
             
-            # Single-pass approach: client + input_video + logo with transitions
             # Scale and prepare all video inputs
-            FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT:force_original_aspect_ratio=decrease,pad=$VIDEO_WIDTH:$VIDEO_HEIGHT:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS[client];"
-            FILTER_COMPLEX+="[1:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video];"
-            FILTER_COMPLEX+="[2:v]fps=30,setpts=PTS-STARTPTS[logo];"
-            
-            # First transition: client to input_video
+            # Client image: fade out to black at the end
             # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[client][video]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$CLIENT_TRANSITION_START[client_video_raw];"
+            FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT:force_original_aspect_ratio=decrease,pad=$VIDEO_WIDTH:$VIDEO_HEIGHT:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,fade=t=out:st=$CLIENT_FADE_OUT_START:d=$TRANSITION_DURATION[client];"
+            FILTER_COMPLEX+="[1:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video];"
+            FILTER_COMPLEX+="[2:v]fps=30,setpts=PTS-STARTPTS,settb=AVTB[logo];"
             
-            # Second transition: client_video_raw to logo (removed initial fade-in to fix black thumbnail)
+            # Generate black gap between client fade-out and main video
+            FILTER_COMPLEX+="color=c=black:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=$BLACK_DURATION:r=30[black];"
+            
+            # Concatenate: client (with fade-out) -> black gap -> main video (appears immediately)
+            # settb=AVTB normalizes timebase so xfade inputs match
+            FILTER_COMPLEX+="[client][black][video]concat=n=3:v=1:a=0,settb=AVTB[client_video_raw];"
+            
+            # Second transition: client_video_raw to logo (xfade remains)
             # shellcheck disable=SC1087
             FILTER_COMPLEX+="[client_video_raw][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
@@ -293,7 +303,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Add client text overlay if provided (only during client image: 0 to CLIENT_TIME)
             if [ -n "$CLIENT_TEXT" ]; then
-                CLIENT_TEXT_FADE_OUT_START=$CLIENT_TRANSITION_START
+                CLIENT_TEXT_FADE_OUT_START=$CLIENT_FADE_OUT_START
                 # Text appears solid immediately to match the image, only fades out
                 FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'"
             fi
@@ -332,7 +342,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 ICON_LEFT_X="max(0,W/2-$ESTIMATED_TEXT_WIDTH/2-w-$ICON_SPACING)"
                 
                 # Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
-                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_FADE_OUT_START:d=$TRANSITION_DURATION:alpha=1[icon_left_scaled];"
                 # Position left icon to the left of the text
                 # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
                 FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_left_scaled]overlay=x='$ICON_LEFT_X':y='(H-h)/1.25':enable='between(t,0,$IMAGE_TIME)':format=auto[v_with_left];"
@@ -350,7 +360,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 ICON_RIGHT_X="min(W-w,W/2+$ESTIMATED_TEXT_WIDTH/2+$ICON_SPACING)"
                 
                 # Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
-                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_TRANSITION_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
+                FILTER_COMPLEX+="[${NEXT_INPUT}:v]scale=-1:${ICON_HEIGHT}:force_original_aspect_ratio=decrease,fade=t=out:st=$CLIENT_FADE_OUT_START:d=$TRANSITION_DURATION:alpha=1[icon_right_scaled];"
                 # Position right icon to the right of the text
                 # Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
                 FILTER_COMPLEX+="[${CURRENT_STREAM}][icon_right_scaled]overlay=x='$ICON_RIGHT_X':y='(H-h)/1.25':enable='between(t,0,$IMAGE_TIME)':format=auto[v_with_right];"
