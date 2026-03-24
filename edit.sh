@@ -31,8 +31,6 @@ BASE_VIDEOS_DIR="$HOME/Videos/eventos"
 # Client image display duration (in seconds)
 IMAGE_TIME=2
 
-# Duration of the black gap between client image fade-out and main video (in seconds)
-BLACK_DURATION=1
 
 # Common text styling
 # Line spacing (pixels between lines)
@@ -253,8 +251,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
-            # Timeline: client(IMAGE_TIME) -> fade-out(within IMAGE_TIME) -> black(BLACK_DURATION) -> video(VIDEO_DURATION) -> xfade -> logo(IMAGE_TIME)
-            PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + BLACK_DURATION + VIDEO_DURATION))  # Total before logo xfade
+            # Timeline: client(IMAGE_TIME w/ fade-out) -> video(VIDEO_DURATION) -> xfade -> logo(IMAGE_TIME)
+            PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + VIDEO_DURATION))  # Total before logo xfade
             TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + IMAGE_TIME - TRANSITION_DURATION))
             
             CLIENT_FADE_OUT_START=$((IMAGE_TIME - TRANSITION_DURATION))
@@ -263,13 +261,12 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Fades apply only to the content part (client + input_video), not logo
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
-            # Event text appears when main video starts (after client + black)
-            VIDEO_START_TIME=$((IMAGE_TIME + BLACK_DURATION))
-            TEXT_FADE_IN_START=$((VIDEO_START_TIME - TRANSITION_DURATION))
-            TEXT_FADE_IN_END=$VIDEO_START_TIME
+            # Event text appears when main video starts (after client)
+            TEXT_FADE_IN_START=$((IMAGE_TIME - TRANSITION_DURATION))
+            TEXT_FADE_IN_END=$IMAGE_TIME
             TEXT_FADE_OUT_START=$VIDEO_END_FADE_START
             
-            echo "Client: ${IMAGE_TIME}s, Black: ${BLACK_DURATION}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s"
+            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s"
             
             # Scale and prepare all video inputs
             # Client image: fade out to black at the end
@@ -278,12 +275,9 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[1:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video];"
             FILTER_COMPLEX+="[2:v]fps=30,setpts=PTS-STARTPTS,settb=AVTB[logo];"
             
-            # Generate black gap between client fade-out and main video
-            FILTER_COMPLEX+="color=c=black:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=$BLACK_DURATION:r=30[black];"
-            
-            # Concatenate: client (with fade-out) -> black gap -> main video (appears immediately)
+            # Concatenate: client (with fade-out) -> main video (appears immediately)
             # settb=AVTB normalizes timebase so xfade inputs match
-            FILTER_COMPLEX+="[client][black][video]concat=n=3:v=1:a=0,settb=AVTB[client_video_raw];"
+            FILTER_COMPLEX+="[client][video]concat=n=2:v=1:a=0,settb=AVTB[client_video_raw];"
             
             # Second transition: client_video_raw to logo (xfade remains)
             # shellcheck disable=SC1087
