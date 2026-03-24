@@ -251,12 +251,12 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
-            # Timeline: client(IMAGE_TIME w/ fade-out) -> video(VIDEO_DURATION) -> xfade -> logo(IMAGE_TIME)
-            PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + VIDEO_DURATION))  # Total before logo xfade
-            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + IMAGE_TIME - TRANSITION_DURATION))
+            # Timeline: client(IMAGE_TIME w/ fade-out) -> video(VIDEO_DURATION w/ slide-up + slide-out) -> logo(IMAGE_TIME w/ fade-in)
+            PRE_LOGO_VISUAL_DUR=$((IMAGE_TIME + VIDEO_DURATION))  # Total before logo
+            TOTAL_DURATION=$((PRE_LOGO_VISUAL_DUR + IMAGE_TIME))  # No overlap (concat, not xfade)
             
             CLIENT_FADE_OUT_START=$((IMAGE_TIME - TRANSITION_DURATION))
-            LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
+            VIDEO_SLIDE_OUT_START=$((VIDEO_DURATION - TRANSITION_DURATION))
             
             # Fades apply only to the content part (client + input_video), not logo
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
@@ -283,11 +283,14 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # shellcheck disable=SC1087
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT:force_original_aspect_ratio=decrease,pad=$VIDEO_WIDTH:$VIDEO_HEIGHT:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,fade=t=out:st=$CLIENT_FADE_OUT_START:d=$TRANSITION_DURATION[client];"
             FILTER_COMPLEX+="[1:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video];"
-            FILTER_COMPLEX+="[2:v]fps=30,setpts=PTS-STARTPTS,settb=AVTB[logo];"
+            # Logo: scale + fade-in from black
+            FILTER_COMPLEX+="[2:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT:force_original_aspect_ratio=decrease,pad=$VIDEO_WIDTH:$VIDEO_HEIGHT:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=$TRANSITION_DURATION[logo];"
             
-            # Slide-up entrance for main video: video moves from bottom to top over TRANSITION_DURATION
+            # Slide-up entrance + slide-out exit for main video (both over TRANSITION_DURATION)
+            # Slide-up: y goes H -> 0 in first TD seconds
+            # Slide-out: y goes 0 -> -H in last TD seconds (slides up off-screen)
             FILTER_COMPLEX+="color=c=black:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=${VIDEO_DURATION}:r=30[video_bg];"
-            FILTER_COMPLEX+="[video_bg][video]overlay=x=0:y='if(lt(t,$TRANSITION_DURATION),H-H*t/$TRANSITION_DURATION,0)':format=auto[video_slide_raw];"
+            FILTER_COMPLEX+="[video_bg][video]overlay=x=0:y='if(lt(t,$TRANSITION_DURATION),H-H*t/$TRANSITION_DURATION,if(gt(t,$VIDEO_SLIDE_OUT_START),-H*(t-$VIDEO_SLIDE_OUT_START)/$TRANSITION_DURATION,0))':format=auto[video_slide_raw];"
             
             # Quad-split effect: 2x2 grid of the same video during quad phases
             HALF_W=$((VIDEO_WIDTH / 2))
@@ -304,9 +307,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # settb=AVTB normalizes timebase so xfade inputs match
             FILTER_COMPLEX+="[client][video_slide]concat=n=2:v=1:a=0,settb=AVTB[client_video_raw];"
             
-            # Second transition: client_video_raw to logo (xfade remains)
-            # shellcheck disable=SC1087
-            FILTER_COMPLEX+="[client_video_raw][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
+            # Concatenate: client_video_raw -> logo (with fade-in)
+            FILTER_COMPLEX+="[client_video_raw][logo]concat=n=2:v=1:a=0[video_combined];"
             
             
             # Add event text overlay (text fades in during transition2: client->video xfade)
