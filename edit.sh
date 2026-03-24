@@ -333,12 +333,20 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Overlay quad on normal video only during Part 2's timeframe (0 to P_LEN)
             FILTER_COMPLEX+="[pr_main][quad]overlay=enable='between(t,0,$P_LEN)':eof_action=pass[part_rest_step1];"
             
+            # --- Transition: Frei0r Distort0r between Part 2 and Part 3 ---
+            DISTORT_START=$(awk "BEGIN {print $P_LEN - $TRANSITION_DURATION / 2.0}")
+            DISTORT_END=$(awk "BEGIN {print $P_LEN + $TRANSITION_DURATION / 2.0}")
+            
+            FILTER_COMPLEX+="[part_rest_step1]split=2[pr_step15_main][distort_src];"
+            FILTER_COMPLEX+="[distort_src]frei0r=filter_name=distort0r:filter_params=0.5|0.005|y|0.25[distorted];"
+            FILTER_COMPLEX+="[pr_step15_main][distorted]overlay=enable='between(t,$DISTORT_START,$DISTORT_END)':eof_action=pass[part_rest_step15];"
+            
             # --- Part 3 Effect: Slow/Fast time warp ---
             # Part 3 plays in slow-motion for the first half, speeding up for the second half
             P3_LOCAL_START=$(( PART3_START - PART2_START ))
             P3_LOCAL_END=$(( PART3_END - PART2_START ))
             
-            FILTER_COMPLEX+="[part_rest_step1]split=2[pr_step2_main][p3_src];"
+            FILTER_COMPLEX+="[part_rest_step15]split=2[pr_step2_main][p3_src];"
             FILTER_COMPLEX+="[p3_src]trim=start=$P3_LOCAL_START:end=$P3_LOCAL_END,setpts=PTS-STARTPTS[p3_trim];"
             
             # T is current time in seconds. First 1/4 of source duration plays at 0.5x speed (takes 1/2 of output P_LEN).
