@@ -200,10 +200,16 @@ if [ -n "$EVENT_COLOR" ]; then
 fi
 
 echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
-echo "Text for videos: \"$EVENT_TEXT\""
-echo "Music: $MUSIC"
+if [ -n "$EVENT_TEXT" ]; then
+	echo "Text for videos: \"$EVENT_TEXT\""
+fi
+
+if [ -n "$MUSIC" ]; then
+	echo "Music: $MUSIC"
+fi
+
 if [ -n "$CLIENT_IMAGE" ]; then
-    echo "Client image: $CLIENT_IMAGE (will display for $IMAGE_TIME seconds)"
+    echo "Client image: $CLIENT_IMAGE"
     if [ -n "$CLIENT_TEXT" ]; then
         echo "Client text: \"$CLIENT_TEXT\""
     fi
@@ -214,7 +220,7 @@ if [ -n "$CLIENT_IMAGE" ]; then
         echo "Right icon: $ICON_RIGHT"
     fi
 fi
-echo "Logo video: $LOGO"
+echo "Logo image: $LOGO"
 echo "Output to: $EDITED_DIR"
 echo "------------------------------------------------------------------"
 
@@ -229,10 +235,8 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
         output_filename="$original_filename"
         output_file_path="$EDITED_DIR/$output_filename"
 
-        echo "Processing original: $original_filename"
-        echo "Input video: $input_video_path"
-        echo "Output will be: $output_filename"
-        echo "Full Output Path: $output_file_path"
+        echo "Full input path: $input_video_path"
+        echo "Full output path: $output_file_path"
 
         # --- Get Video Duration ---
         VIDEO_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$input_video_path" | cut -d'.' -f1)
@@ -259,7 +263,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             TEXT_FADE_IN_END=$IMAGE_TIME
             TEXT_FADE_OUT_START=$VIDEO_END_FADE_START
             
-            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${TOTAL_DURATION}s)"
+            echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s"
             
             # Single-pass approach: client + input_video + logo with transitions
             # Scale and prepare all video inputs
@@ -284,7 +288,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                 # Average character width 0.37 * font_size for most fonts, this seems to work ok
                 CHAR_COUNT=${#CLIENT_TEXT}
                 ESTIMATED_TEXT_WIDTH=$(awk "BEGIN {printf \"%.0f\", $CHAR_COUNT * $FONT_SIZE * 0.37}")
-                echo "Debug: Text '$CLIENT_TEXT' ($CHAR_COUNT chars) -> Estimated visual width: $ESTIMATED_TEXT_WIDTH px"
+                log_info "Debug: Text '$CLIENT_TEXT' ($CHAR_COUNT chars) -> Estimated visual width: $ESTIMATED_TEXT_WIDTH px"
             fi
             
             # Add client text overlay if provided (only during client image: 0 to CLIENT_TIME)
@@ -400,7 +404,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             LOGO_TRANSITION_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
-            echo "Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s (Music: ${TOTAL_DURATION}s)"
+            echo "Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s"
             
             # Scale and prepare video inputs
             FILTER_COMPLEX="[0:v]scale=$VIDEO_WIDTH:$VIDEO_HEIGHT,fps=30,setpts=PTS-STARTPTS[video_raw];"
