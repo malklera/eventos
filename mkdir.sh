@@ -34,3 +34,6 @@ mkdir "$EDITED_DIR"
 mkdir "$CUTTED_DIR"
 mkdir "$CATALOG_DIR"
 mkdir "$RENAMED_DIR"
+
+cp "$BASE_VIDEOS_DIR/assets/1 - Indicaciones.txt" "$EVENT_DIR"
+echo "./edit.sh -e $EVENT_NAME -l contact.png" > "$EVENT_DIR/edit.txt"
