@@ -50,12 +50,13 @@ CLIENT_TEXT_X="(w-tw)/2"
 CLIENT_TEXT_Y="(h-th)/1.25"
 
 # Event text styling (appears during filmed video)
-TEXT_X="w-tw-20"
-TEXT_Y="H-th-20"
+TEXT_X="(w-tw)/2"
+TEXT_Y="H-th-100"  # Moved up from the bottom slightly for better look when centered
+TEXT_MARGIN=100
 
 # A helper function to display usage information
 usage() {
-    echo "Usage: $0 -e <event_name> -m <music> -l <logo_video> [-t \"<event_text>\"] [-i <client_image>] [-c \"<client_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
+    echo "Usage: $0 -e <event_name> -m <music> -l <logo_video> [-t \"<event_text>\"] [-i <client_image>] [-c \"<client_text>\"] [-u \"<upper_text>\"] [-d \"<down_text>\"] [-C \"<client_color>\"] [-T \"<text_color>\"] [-f <font>] [-L <left_icon>] [-R <right_icon>]"
     echo ""
     echo "  -e, --event        : Name of the event same name used with ./mkdir <event-name>."
     echo "  -l, --logo         : Partial path to logo image file (~/Videos/eventos/assets/logo/<your path>)."
@@ -63,6 +64,8 @@ usage() {
     echo "  -i, --image        : (Optional) Client image file name, file has to be inside <event-name>/."
 	echo "  -t, --text         : (Optional) Text to overlay on all videos for this event (enclose in quotes if it has spaces)."
     echo "  -c, --client       : (Optional) Client text to display over client image (enclose in quotes if it has spaces)."
+    echo "  -u, --upper        : (Optional) Upper line of client text (manual split, bypasses auto-wrap)."
+    echo "  -d, --down         : (Optional) Lower line of client text (manual split, bypasses auto-wrap)."
     echo "  -C, --client-color : (Optional) Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
     echo "  -T, --text-color   : (Optional) Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\")."
     echo "  -f, --font         : (Optional) Font filename to use for event text (e.g., MyFont.ttf)."
@@ -94,6 +97,14 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -c|--client)
             CLIENT_TEXT="$2"
+            shift # past argument
+            ;;
+        -u|--upper)
+            CLIENT_TEXT_UP="$2"
+            shift # past argument
+            ;;
+        -d|--down)
+            CLIENT_TEXT_DOWN="$2"
             shift # past argument
             ;;
         -C|--client-color)
@@ -198,6 +209,42 @@ fi
 
 if [ -n "$EVENT_COLOR" ]; then
     FONT_COLOR="$EVENT_COLOR"
+fi
+
+# --- Text Wrapping Logic ---
+# Function to wrap text based on estimated character width
+wrap_text() {
+    local raw_text="$1"
+    local max_w=$((VIDEO_WIDTH - TEXT_MARGIN))
+    # Font size is 80. Use 0.7 factor (approx 56px) for an even safer wrap.
+    # We now use physical newlines as FFmpeg handles them better through eval.
+    local avg_char_w=$((FONT_SIZE * 7 / 10))
+    local max_chars=$((max_w / avg_char_w))
+    
+    # Use fold to wrap with physical newlines
+    echo "$raw_text" | fold -s -w "$max_chars"
+}
+
+if [ -n "$EVENT_TEXT" ]; then
+    EVENT_TEXT=$(wrap_text "$EVENT_TEXT")
+fi
+
+# --- Handle Upper and Down text flags ---
+if [ -n "$CLIENT_TEXT_UP" ] || [ -n "$CLIENT_TEXT_DOWN" ]; then
+    # If upper/down are provided, they take precedence over -c
+    if [ -n "$CLIENT_TEXT_UP" ] && [ -n "$CLIENT_TEXT_DOWN" ]; then
+        CLIENT_TEXT="${CLIENT_TEXT_UP}"$'\n'"${CLIENT_TEXT_DOWN}"
+    elif [ -n "$CLIENT_TEXT_UP" ]; then
+        CLIENT_TEXT="$CLIENT_TEXT_UP"
+    else
+        CLIENT_TEXT="$CLIENT_TEXT_DOWN"
+    fi
+    # When using explicit upper/down, skip auto-wrapping to give user control
+    SKIP_WRAP_CLIENT=true
+fi
+
+if [ -n "$CLIENT_TEXT" ] && [ "$SKIP_WRAP_CLIENT" != true ]; then
+    CLIENT_TEXT=$(wrap_text "$CLIENT_TEXT")
 fi
 
 echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
@@ -408,26 +455,40 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[client_video_raw][logo]concat=n=2:v=1:a=0[video_combined];"
             
             
-            # Add event text overlay (text fades in during transition2: client->video xfade)
-            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(lt(t,$TEXT_FADE_IN_START),0,if(lt(t,$TEXT_FADE_IN_END),(t-$TEXT_FADE_IN_START)/$TRANSITION_DURATION,if(gt(t,$TEXT_FADE_OUT_START),(1-(t-$TEXT_FADE_OUT_START)/$TRANSITION_DURATION),1)))'"
-            
-            # Estimate text width for icon positioning (if CLIENT_TEXT exists)
-            if [ -n "$CLIENT_TEXT" ]; then
-                # Average character width 0.37 * font_size for most fonts, this seems to work ok
-                CHAR_COUNT=${#CLIENT_TEXT}
-                ESTIMATED_TEXT_WIDTH=$(awk "BEGIN {printf \"%.0f\", $CHAR_COUNT * $FONT_SIZE * 0.37}")
-                log_info "Debug: Text '$CLIENT_TEXT' ($CHAR_COUNT chars) -> Estimated visual width: $ESTIMATED_TEXT_WIDTH px"
+            # --- Dynamic Text Overlay Logic (Case 1) ---
+            CUR_V="video_combined"
+
+            # 1. EVENT_TEXT (during filmed video)
+            if [ -n "$EVENT_TEXT" ]; then
+                # Use literal newlines; avoiding complex escaping that causes 'n' artifacts
+                ESC_EVENT_TEXT=$(echo -n "$EVENT_TEXT" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
+                FILTER_COMPLEX+="[$CUR_V]drawtext=text='$ESC_EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:text_align=center:alpha='if(lt(t,$TEXT_FADE_IN_START),0,if(lt(t,$TEXT_FADE_IN_END),(t-$TEXT_FADE_IN_START)/$TRANSITION_DURATION,if(gt(t,$TEXT_FADE_OUT_START),(1-(t-$TEXT_FADE_OUT_START)/$TRANSITION_DURATION),1)))'[v_ev];"
+                CUR_V="v_ev"
             fi
-            
-            # Add client text overlay if provided (only during client image: 0 to CLIENT_TIME)
+
+            # 2. CLIENT_TEXT (during introduction image)
             if [ -n "$CLIENT_TEXT" ]; then
                 CLIENT_TEXT_FADE_OUT_START=$CLIENT_FADE_OUT_START
-                # Text appears solid immediately to match the image, only fades out
-                FILTER_COMPLEX+=",drawtext=text='$CLIENT_TEXT':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'"
+                if [ -n "$CLIENT_TEXT_UP" ] || [ -n "$CLIENT_TEXT_DOWN" ]; then
+                    # Manual split: two separate drawtext filters for total control as requested
+                    if [ -n "$CLIENT_TEXT_UP" ]; then
+                        FF_UP=$(echo -n "$CLIENT_TEXT_UP" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
+                        FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_UP':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y-60:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_up];"
+                        CUR_V="v_up"
+                    fi
+                    if [ -n "$CLIENT_TEXT_DOWN" ]; then
+                        FF_DOWN=$(echo -n "$CLIENT_TEXT_DOWN" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
+                        FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_DOWN':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y+60:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_dw];"
+                        CUR_V="v_dw"
+                    fi
+                else
+                    # Fallback to single text (auto-wrapped if needed)
+                    FF_CL=$(echo -n "$CLIENT_TEXT" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
+                    FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_CL':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:text_align=center:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_cl];"
+                    CUR_V="v_cl"
+                fi
             fi
-            
-            # Label the output after text overlays
-            FILTER_COMPLEX+="[v_with_text];"
+            FILTER_COMPLEX+="[$CUR_V]null[v_with_text];"
             
             # Identify the audio source and handle optional music/video audio
             CURRENT_STREAM="v_with_text"
@@ -542,8 +603,14 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # shellcheck disable=SC1087
             FILTER_COMPLEX+="[video_raw][logo]xfade=transition=fade:duration=$TRANSITION_DURATION:offset=$LOGO_TRANSITION_START[video_combined];"
             
-            # Add text overlay
-            FILTER_COMPLEX+="[video_combined]drawtext=text='$EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000000:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:alpha='if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1)'[v_out];"
+            # --- Dynamic Text Overlay Logic (Case 2) ---
+            CUR_V="video_combined"
+            if [ -n "$EVENT_TEXT" ]; then
+                ESC_EVENT_TEXT=$(echo -n "$EVENT_TEXT" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
+                FILTER_COMPLEX+="[$CUR_V]drawtext=text='$ESC_EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:text_align=center:alpha='if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1)'[v_out];"
+            else
+                FILTER_COMPLEX+="[$CUR_V]null[v_out];"
+            fi
             
             # Audio: Handle optional music and silent videos
             if [ -n "$MUSIC" ]; then

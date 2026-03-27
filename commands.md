@@ -12,7 +12,7 @@ Generate the QR for the event.
 
 ```sh
 cd ~/Videos/eventos/event-name
-qrtool encode -o <event-name>.svg -t svg "<link>"
+qrtool encode -o link.svg -t svg "<url>"
 ```
 Copy videos from phone to ~/Videos/eventos/event-name/original
 
@@ -45,15 +45,6 @@ See the output of that, if it look ok, remove the -n flag
 
 Construct the command into a edit.txt file on the event-name directory.
 
-
----
-
-# Estructura del video
-
-(transicion fade-in)+(imagen cliente)   +(transicion xfade)     +(video filmado)+(transicion xfade)     +(video logo)
-(transicion fade-in)+(texto cliente)    +(transicion fade-out)  
-                                         (transicion fade-in)   +(texto video)  +(transicion fade-out)
-(transicion fade-in)+(musica)                                                   +(transicion acrossfade)+(musica logo)+(transicion fade-out)
 
 ---
 
