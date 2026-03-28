@@ -11,10 +11,15 @@ cd ~/Videos/eventos
 Generate the QR for the event.
 
 ```sh
-cd ~/Videos/eventos/event-name
+cd ~/Videos/eventos/<event-name>
 qrtool encode -o link.svg -t svg "<url>"
 ```
 Copy videos from phone to ~/Videos/eventos/event-name/original
+
+```sh
+cd ~/Videos/eventos/<event-name>
+rsync -rtv --progress --inplace --omit-dir-times <phone> originales
+```
 
 ```sh
 ./rename.sh <event-name>
