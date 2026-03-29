@@ -17,8 +17,8 @@ qrtool encode -o link.svg -t svg "<url>"
 Copy videos from phone to ~/Videos/eventos/event-name/original
 
 ```sh
-cd ~/Videos/eventos/<event-name>
-rsync -rtv --progress --inplace --omit-dir-times <phone> originales
+cd .../Almacenamiento interno/DCIM/Camera/
+rsync -rtv --progress --inplace --omit-dir-times *.mp4 ~/Videos/eventos/<event-name>/original
 ```
 
 ```sh
@@ -34,6 +34,10 @@ Cut each video manually and export them to ~/Videos/eventos/event-name/cortado
 In the process take a screenshot of each for the catalog.
 
 Put all images into the "catalogo" directory.
+
+```sh
+mv ~/Videos/eventos/<event-name>/cortado/*.png ~/Videos/eventos/<event-name>/catalogo
+```
 
 ```sh
 cd ~/Videos/eventos/<event-name>/catalogo
