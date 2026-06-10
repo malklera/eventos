@@ -86,7 +86,6 @@ while [[ "$#" -gt 0 ]]; do
             EVENT_TEXT="$2"
             shift # past argument
             ;;
-
         -m|--music)
             MUSIC="$BASE_VIDEOS_DIR/assets/musica/cortado/$2"
             shift # past argument
