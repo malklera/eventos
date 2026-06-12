@@ -1,11 +1,11 @@
+/*
+Copyright © 2026 NAME HERE <EMAIL ADDRESS>
+
+*/
 package main
 
-import (
-	""
-	"fmt"
-	"os"
-)
+import "github.com/malklera/eventos/cmd"
 
 func main() {
-
+	cmd.Execute()
 }
