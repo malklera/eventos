@@ -32,13 +32,18 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			fmt.Println("error:", err)
 		}
-		err = os.Mkdir(filepath.Join(event, "original"), 0750)
-		err = os.Mkdir(filepath.Join(event, "formateado"), 0750)
-		err = os.Mkdir(filepath.Join(event, "cortado"), 0750)
-		err = os.Mkdir(filepath.Join(event, "editado"), 0750)
-		err = os.Mkdir(filepath.Join(event, "catalogo"), 0750)
-		err = os.Mkdir(filepath.Join(event, "renombrado"), 0750)
-		if err != nil {
+		err2 := os.Mkdir(filepath.Join(event, "original"), 0750)
+		err3 := os.Mkdir(filepath.Join(event, "renombrado"), 0750)
+		err4 := os.Mkdir(filepath.Join(event, "formateado"), 0750)
+		err5 := os.Mkdir(filepath.Join(event, "cortado"), 0750)
+		err6 := os.Mkdir(filepath.Join(event, "editado"), 0750)
+		err7 := os.Mkdir(filepath.Join(event, "catalogo"), 0750)
+		if err2 != nil ||
+			err3 != nil ||
+			err4 != nil ||
+			err5 != nil ||
+			err6 != nil ||
+			err7 != nil {
 			if err := os.RemoveAll(event); err != nil {
 				return err
 			}
