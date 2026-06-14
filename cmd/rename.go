@@ -19,11 +19,10 @@ var renameCmd = &cobra.Command{
 	Short: "Rename the files into the order they where created.",
 	Long:  `I say rename, but it is a copy with a different final name.`,
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
-		files, err := os.ReadDir("original")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		files, err := listVideos("original")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading 'original': %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading 'original': %w", err)
 		}
 
 		for n, file := range files {
@@ -49,6 +48,7 @@ var renameCmd = &cobra.Command{
 				fmt.Fprintf(os.Stderr, "error dstF.Sync(): %v\n", err)
 			}
 		}
+		return nil
 	},
 }
 
