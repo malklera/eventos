@@ -7,4 +7,4 @@ Commands:
 - qr
 - rename
 - format
-- edit
+- edit 

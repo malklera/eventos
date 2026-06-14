@@ -271,6 +271,7 @@ echo "Logo image: $LOGO"
 echo "Output to: $EDITED_DIR"
 echo "------------------------------------------------------------------"
 
+# TODO: copy up to here
 processed_count=1
 
 # (Logo duration is now calculated earlier) 

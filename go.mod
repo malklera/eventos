@@ -3,6 +3,7 @@ module github.com/malklera/eventos
 go 1.26.3
 
 require (
+	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/spf13/cobra v1.10.2
 	github.com/yeqown/go-qrcode/v2 v2.2.5
 	github.com/yeqown/go-qrcode/writer/standard v1.3.0
