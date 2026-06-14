@@ -18,6 +18,7 @@ var renameCmd = &cobra.Command{
 	Use:   "rename",
 	Short: "Rename the files into the order they where created.",
 	Long:  `I say rename, but it is a copy with a different final name.`,
+	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		files, err := os.ReadDir("original")
 		if err != nil {

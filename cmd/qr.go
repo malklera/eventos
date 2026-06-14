@@ -4,8 +4,6 @@ Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/yeqown/go-qrcode/v2"
 	"github.com/yeqown/go-qrcode/writer/standard"
@@ -16,24 +14,18 @@ var qrCmd = &cobra.Command{
 	Use:   "qr <url>",
 	Short: "Generate the QR code image for the event.",
 	Long:  `e.g. ./eventos qr <url>`,
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		switch len(args) {
-		case 1:
-			qrc, err := qrcode.New(args[0])
-			if err != nil {
-				return err
-			}
-			w, err := standard.New("qrCode.jpeg")
-			if err != nil {
-				return err
-			}
-			if err := qrc.Save(w); err != nil {
-				return err
-			}
-		case 0:
-			return fmt.Errorf("have to provide an <url>")
-		default:
-			return fmt.Errorf("too many arguments")
+		qrc, err := qrcode.New(args[0])
+		if err != nil {
+			return err
+		}
+		w, err := standard.New("qrCode.jpeg")
+		if err != nil {
+			return err
+		}
+		if err := qrc.Save(w); err != nil {
+			return err
 		}
 		return nil
 	},

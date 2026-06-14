@@ -17,6 +17,7 @@ import (
 var formatCmd = &cobra.Command{
 	Use:   "format",
 	Short: "Makes the videos fixed frame rate and took out sound.",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		src := "renombrado"
 		dst := "formateado"

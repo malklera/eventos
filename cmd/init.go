@@ -18,16 +18,9 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Create the required directories to contain the event",
 	Long:  `e.g. ./eventos init eventName`,
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		event := ""
-		switch len(args) {
-		case 1:
-			event = args[0]
-		case 0:
-			return fmt.Errorf("eventName is required")
-		default:
-			return fmt.Errorf("only pass one eventName")
-		}
+		event := args[0]
 		err := os.Mkdir(event, 0750)
 		if err != nil {
 			fmt.Println("error:", err)
