@@ -6,6 +6,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	// "path/filepath"
 
 	"github.com/mitchellh/go-wordwrap"
 	"github.com/spf13/cobra"
@@ -33,26 +37,26 @@ var editCmd = &cobra.Command{
 	Use:   "edit",
 	Short: "Command to edit the videos",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		videoWidth := 1080
-		videoHeight := 1920
-		transitionDuration := 1
-		clientImgTime := 2
+		// videoHeight := 1920
+		// transitionDuration := 1
+		// clientImgTime := 2
 
 		// Text styling
-		lineSpacing := 10
+		// lineSpacing := 10
 		fontSize := 80
-		borderWidth := 2
-		borderColor := "#000000"
-		boxPadding := 8
-		clientTextX := "(w-tw)/2"
-		clientTextY := "(h-th)/1.25"
-		eventTextX := "(w-tw)/2"
-		eventTextY := "H-th-100"
+		// borderWidth := 2
+		// borderColor := "#000000"
+		// boxPadding := 8
+		// clientTextX := "(w-tw)/2"
+		// clientTextY := "(h-th)/1.25"
+		// eventTextX := "(w-tw)/2"
+		// eventTextY := "H-th-100"
 		eventTextMargin := 100
 
 		cuttedDir := "cortado"
-		editedDir := "editado"
+		// editedDir := "editado"
 
 		// If eventText is not empty, wrap it as needed
 		if eventText != "" {
@@ -62,7 +66,19 @@ var editCmd = &cobra.Command{
 		if clientText != "" {
 			clientText = wrapText(clientText, fontSize, videoWidth, eventTextMargin)
 		}
+		cutVideos, err := listVideos(cuttedDir)
+		if err != nil {
+			return fmt.Errorf("listVideos(%s): %w", cuttedDir, err)
+		}
 
+		editedCount := 1
+		fmt.Println("Total videos:", len(cutVideos))
+		// for _, file := range cutVideos {
+		// fullPath := filepath.Join(cuttedDir, file.Name())
+		// vDuration, err := videoDuration(fullPath)
+		// }
+		fmt.Println("Edited videos:", editedCount)
+		return nil
 	},
 }
 
@@ -98,4 +114,27 @@ func init() {
 func wrapText(text string, fontSize int, videoW int, margin int) string {
 	// Use a 0.7 factor (aprox 56px) for safer wrap.
 	return wordwrap.WrapString(text, uint((videoW-margin)/(fontSize*7/10)))
+}
+
+// videoDuration take a path and run ffprobe to learn its duration, return the quotient and any error
+func videoDuration(path string) (int, error) {
+	ffprobe := exec.Command("ffprobe",
+		"-loglevel",
+		"error",
+		"-show_entries",
+		"format=duration",
+		"-output_format",
+		"default=noprint_wrappers=1:nokey=1",
+		path)
+	ffprobe.Stderr = os.Stderr
+	out, err := ffprobe.Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe.Run(%s): %w", ffprobe.String(), err)
+	}
+	str, _, _ := strings.Cut(string(out), ".")
+	dur, err := strconv.Atoi(str)
+	if err != nil {
+		return 0, fmt.Errorf("strconv.Atoi(string(%v)): %w", out, err)
+	}
+	return dur, nil
 }
