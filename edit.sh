@@ -174,6 +174,7 @@ if [ -n "$CUTTED_DIR" ] && [ ! -d "$CUTTED_DIR" ]; then
     log_info "Please perform manual cuts in Shotcut first and export videos there."
     exit 1
 fi
+
 if [ -z "$FONT" ]; then
     FONT=$(fc-match -f "%{file}" sans 2>/dev/null)
 fi
