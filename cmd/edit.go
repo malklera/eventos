@@ -38,10 +38,13 @@ var editCmd = &cobra.Command{
 	Short: "Command to edit the videos",
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := checkArgs(); err != nil {
+			return err
+		}
 		videoW := 1080
 		// videoH := 1920
 		transitionT := 1
-		clientImgT := 2
+		imageT := 2
 
 		// Text styling
 		// lineSpacing := 10
@@ -66,9 +69,12 @@ var editCmd = &cobra.Command{
 		// If clientText is not empty, wrap it as needed
 		if clientText != "" {
 			clientText = wrapText(clientText, fontSize, videoW, eventTextMargin)
+		} else {
+			// If it is empty, add the up and down text
+			clientText = up + "\n" + down
 		}
 
-		// TODO: check that all arg passed exists
+		textW := maxLenght(clientText, fontSize)
 
 		cuttedVideos, err := listVideos(cuttedDir)
 		if err != nil {
@@ -79,26 +85,22 @@ var editCmd = &cobra.Command{
 		fmt.Println("Total videos:", len(cuttedVideos))
 		for _, file := range cuttedVideos {
 			videoPath := filepath.Join(cuttedDir, file.Name())
-			videoDur, err := videoDuration(videoPath)
+			videoT, err := videoDuration(videoPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error getting the duration of '%s': %v", videoPath, err)
-				continue
-			}
-			logoDur, err := videoDuration(logo)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error getting the duration of '%s': %v", logo, err)
 				continue
 			}
 
 			// client image + main video + logo
 			if image != "" {
-				preLogoVisualDur := videoDur + clientImgT
-				totalDur := preLogoVisualDur + logoDur
-				clientFadeOutStart := clientImgT - transitionT
-				videoSlideOutStart := videoDur - transitionT
-				videoEndFadeStart := preLogoVisualDur - transitionT
-				segmentY := (videoDur - transitionT) / 8
-				pLen := (videoDur + 2*transitionT) / 5
+				preLogoVisualT := videoT + imageT
+				totalT := preLogoVisualT + imageT
+				clientFadeOutStart := imageT - transitionT
+				videoFadeOutStart := videoT - transitionT
+				videoEndFadeStart := preLogoVisualT - transitionT
+				segmentY := (videoT - transitionT) / 8
+				pLen := (videoT + 2*transitionT) / 5
+
 				part1Start := 0
 				part1End := pLen
 
@@ -113,12 +115,12 @@ var editCmd = &cobra.Command{
 				part4End := part4Start + pLen
 
 				part5Start := part4End - transitionT
-				part5End := videoDur
+				part5End := videoT
 
-				textFadeInStart := clientImgT - transitionT
-				textFadeInEnd := clientImgT
+				textFadeInStart := imageT - transitionT
+				textFadeInEnd := imageT
 				textFadeOutStart := videoEndFadeStart
-				fmt.Printf("Client: %d, Video: %d, Logo: %d, Total: %d\n", clientImgT, videoDur, logoDur)
+				fmt.Printf("Client: %d, Video: %d, Logo: %d, Total: %d\n", imageT, videoT, imageT)
 
 			} else {
 
@@ -132,8 +134,8 @@ var editCmd = &cobra.Command{
 func init() {
 	// Do not really need this i think, at least for now.
 	// editCmd.Flags().String("event", "e", "", "Name of the event.")
-	editCmd.Flags().StringVarP(&logo, "logo", "l", "", "Partial path to logo image file (~/Videos/eventos/assets/logo/<your_path>).")
-	editCmd.Flags().StringVarP(&music, "music", "m", "", "Partial path to music file (~/Videos/eventos/assets/musica/cortado/<your_path>).")
+	editCmd.Flags().StringVarP(&logo, "logo", "l", "", "Path to logo image file (~/Videos/eventos/assets/logo/myLogo.png).")
+	editCmd.Flags().StringVarP(&music, "music", "m", "", "Path to music file (~/Videos/eventos/assets/musica/cortado/myMusic.mp3).")
 	editCmd.Flags().StringVarP(&image, "image", "i", "", "Client image file name, file has to be inside <event-name>/.")
 	editCmd.Flags().StringVarP(&eventText, "text", "t", "", "Text to overlay on the whole video.")
 
@@ -186,10 +188,57 @@ func videoDuration(path string) (int, error) {
 	return dur, nil
 }
 
+// TODO: change checkArgs for validateArgs, and check that the colors have the
+// correct format
+
 // checkArgs ensure all passed arguments exists
-func checkArgs(logoPath string) error {
-	_, err := os.Stat(logoPath)
+func checkArgs() error {
+	_, err := os.Stat(logo)
 	if err != nil {
 		return err
 	}
+	if image != "" {
+		_, err = os.Stat(image)
+		if err != nil {
+			return err
+		}
+	}
+	if music != "" {
+		_, err = os.Stat(music)
+		if err != nil {
+			return err
+		}
+	}
+	if font != "" {
+		_, err = os.Stat(font)
+		if err != nil {
+			return err
+		}
+	}
+	if leftIcon != "" {
+		_, err = os.Stat(leftIcon)
+		if err != nil {
+			return err
+		}
+	}
+	if rightIcon != "" {
+		_, err = os.Stat(rightIcon)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// maxLenght takes a possibly newline separated string and measure the longest
+// line in it
+func maxLenght(t string, fontSize int) int {
+	parts := strings.Split(t, "\n")
+	lenght := 0
+	for _, p := range parts {
+		if lenght < len(p) {
+			lenght = len(p)
+		}
+	}
+	return lenght * fontSize * 7 / 10
 }
