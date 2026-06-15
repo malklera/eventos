@@ -98,7 +98,7 @@ var editCmd = &cobra.Command{
 				videoSlideOutStart := videoDur - transitionT
 				videoEndFadeStart := preLogoVisualDur - transitionT
 				segmentY := (videoDur - transitionT) / 8
-				pLen := (videoDur + 2 * transitionT) / 5
+				pLen := (videoDur + 2*transitionT) / 5
 				part1Start := 0
 				part1End := pLen
 
@@ -118,7 +118,7 @@ var editCmd = &cobra.Command{
 				textFadeInStart := clientImgT - transitionT
 				textFadeInEnd := clientImgT
 				textFadeOutStart := videoEndFadeStart
-				fmt.Printf("Client: %d, Video: %d, Logo: %d, Total: %d\n",clientImgT, videoDur, logoDur)
+				fmt.Printf("Client: %d, Video: %d, Logo: %d, Total: %d\n", clientImgT, videoDur, logoDur)
 
 			} else {
 
@@ -144,7 +144,7 @@ func init() {
 	editCmd.Flags().StringVarP(&down, "down", "d", "", "Lower line of client text (manual split, bypasses auto-wrap).")
 	editCmd.Flags().StringVarP(&clientColor, "client-color", "C", "#E6E70F", "Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
 	editCmd.Flags().StringVarP(&textColor, "text-color", "T", "#E6E70F", "Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
-	editCmd.Flags().StringVarP(&font, "font", "f", "", "Font filename to use for event text (e.g., MyFont.ttf).")
+	editCmd.Flags().StringVarP(&font, "font", "f", "/usr/local/share/fonts/Courgette-Regular.ttf", "Path to font to use for all text (e.g., /usr/share/fonts/TTF/MyFont.ttf).")
 	editCmd.Flags().StringVarP(&leftIcon, "left", "L", "", "Path to icon image to display to the left of client text.")
 	editCmd.Flags().StringVarP(&rightIcon, "right", "R", "", "Path to icon image to display to the right of client text.")
 
@@ -188,7 +188,8 @@ func videoDuration(path string) (int, error) {
 
 // checkArgs ensure all passed arguments exists
 func checkArgs(logoPath string) error {
-	file, err := os.Stat(logoPath)
+	_, err := os.Stat(logoPath)
 	if err != nil {
-	return }
+		return err
+	}
 }
