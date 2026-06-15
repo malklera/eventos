@@ -91,7 +91,7 @@ while [[ "$#" -gt 0 ]]; do
             shift # past argument
             ;;
         -i|--image)
-            CLIENT_IMAGE="$BASE_VIDEOS_DIR/$EVENT_NAME/$2"
+            CLIENT_IMAGE_NAME="$2"
             shift # past argument
             ;;
         -c|--client)
@@ -154,6 +154,10 @@ if [ -n "$EVENT_NAME" ]; then
     EDITED_DIR="$BASE_VIDEOS_DIR/$EVENT_NAME/editado"
 fi
 
+if [ -n "$CLIENT_IMAGE_NAME" ]; then
+    CLIENT_IMAGE="$BASE_VIDEOS_DIR/$EVENT_NAME/$CLIENT_IMAGE_NAME"
+fi
+
 if [ -n "$MUSIC" ] && [ ! -f "$MUSIC" ]; then
     log_error "Error: Music file not found at '$MUSIC'"
     exit 1
@@ -170,6 +174,10 @@ if [ -n "$CUTTED_DIR" ] && [ ! -d "$CUTTED_DIR" ]; then
     log_info "Please perform manual cuts in Shotcut first and export videos there."
     exit 1
 fi
+if [ -z "$FONT" ]; then
+    FONT=$(fc-match -f "%{file}" sans 2>/dev/null)
+fi
+
 if [ -n "$FONT" ] && [ ! -f "$FONT" ]; then
     log_error "Error: Font file not found at '$FONT'. Please ensure it's installed or provide a correct path."
     log_info "You can list available fonts with: fc-list | rg .ttf"
@@ -246,6 +254,16 @@ if [ -n "$CLIENT_TEXT" ] && [ "$SKIP_WRAP_CLIENT" != true ]; then
     CLIENT_TEXT=$(wrap_text "$CLIENT_TEXT")
 fi
 
+# Estimate max text width in pixels for icon positioning
+if [ -n "$CLIENT_TEXT" ]; then
+    LONGEST=0
+    while IFS= read -r line; do
+        len=${#line}
+        [ "$len" -gt "$LONGEST" ] && LONGEST=$len
+    done <<< "$CLIENT_TEXT"
+    ESTIMATED_TEXT_WIDTH=$(( LONGEST * FONT_SIZE * 7 / 10 ))
+fi
+
 echo "--- Starting Automated Processing for Event: '$EVENT_NAME' ---"
 if [ -n "$EVENT_TEXT" ]; then
 	echo "Text for videos: \"$EVENT_TEXT\""
@@ -271,7 +289,7 @@ echo "Logo image: $LOGO"
 echo "Output to: $EDITED_DIR"
 echo "------------------------------------------------------------------"
 
-processed_count=1
+processed_count=0
 
 # (Logo duration is now calculated earlier) 
 # Loop through each .mp4 file from the manually cut videos
@@ -292,9 +310,6 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             continue
         fi
 
-        # This is not needed, the formater take sound out
-        # Check if the video has an audio stream
-        HAS_AUDIO=$(ffprobe -v error -select_streams a -show_entries stream=index -of default=noprint_wrappers=1:nokey=1 "$input_video_path")
         # Determine the structure based on what's provided
         if [ -n "$CLIENT_IMAGE" ]; then
             # Case 1: Client Image + Main Video + Logo Video
@@ -494,19 +509,10 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             CURRENT_STREAM="v_with_text"
             if [ -n "$MUSIC" ]; then
                 # Music covers the full duration
-                # shellcheck disable=SC1087
                 FILTER_COMPLEX+="[3:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out];"
                 NEXT_INPUT=4 # Icons start after [3:a]
-            elif [ -n "$HAS_AUDIO" ]; then
-                # No music, use video audio [1:a]
-                # Delay it to match video start (IMAGE_TIME - TRANSITION_DURATION)
-                DELAY_MS=$(( (IMAGE_TIME - TRANSITION_DURATION) * 1000 ))
-                if [ $DELAY_MS -lt 0 ]; then DELAY_MS=0; fi
-                # shellcheck disable=SC1087
-                FILTER_COMPLEX+="[1:a]adelay=${DELAY_MS}|${DELAY_MS},atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out];"
-                NEXT_INPUT=3 # Icons start after [2:v] (logo)
             else
-                # No music and no video audio, generate silence to prevent ffmpeg crash
+                # No music, generate silence to prevent ffmpeg crash
                 FILTER_COMPLEX+="anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS[a_out];"
                 NEXT_INPUT=3 # Icons start after [2:v] (logo)
             fi
@@ -550,40 +556,40 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             FILTER_COMPLEX+="[${CURRENT_STREAM}]null[v_out]"
             
             # Build ffmpeg command with optional icon inputs
-            FFMPEG_CMD="ffmpeg -v warning"
-            FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$CLIENT_IMAGE\""
-            FFMPEG_CMD+=" -i \"$input_video_path\""
-            FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$LOGO\""
+            FFMPEG_CMD=(ffmpeg -v warning)
+            FFMPEG_CMD+=(-loop 1 -t "$IMAGE_TIME" -i "$CLIENT_IMAGE")
+            FFMPEG_CMD+=(-i "$input_video_path")
+            FFMPEG_CMD+=(-loop 1 -t "$IMAGE_TIME" -i "$LOGO")
             
             if [ -n "$MUSIC" ]; then
-                FFMPEG_CMD+=" -i \"$MUSIC\""
+                FFMPEG_CMD+=(-i "$MUSIC")
             fi
             
             # Add icon inputs if provided (loop them like client image)
             if [ -n "$ICON_LEFT" ]; then
-                FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$ICON_LEFT\""
+                FFMPEG_CMD+=(-loop 1 -t "$IMAGE_TIME" -i "$ICON_LEFT")
             fi
             if [ -n "$ICON_RIGHT" ]; then
-                FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$ICON_RIGHT\""
+                FFMPEG_CMD+=(-loop 1 -t "$IMAGE_TIME" -i "$ICON_RIGHT")
             fi
             
-            FFMPEG_CMD+=" -filter_complex \"$FILTER_COMPLEX\""
-            FFMPEG_CMD+=" -map \"[v_out]\""
-            FFMPEG_CMD+=" -map \"[a_out]\""
-            FFMPEG_CMD+=" -t \"$TOTAL_DURATION\""
-            FFMPEG_CMD+=" -c:v libx264"
-            FFMPEG_CMD+=" -pix_fmt yuv420p"
-            FFMPEG_CMD+=" -profile:v high"
-            FFMPEG_CMD+=" -preset medium"
-            FFMPEG_CMD+=" -crf 23"
-            FFMPEG_CMD+=" -c:a aac"
-            FFMPEG_CMD+=" -b:a 192k"
-            FFMPEG_CMD+=" -movflags +faststart"
-            FFMPEG_CMD+=" -f mp4"
-            FFMPEG_CMD+=" \"$output_file_path\""
+            FFMPEG_CMD+=(-filter_complex "$FILTER_COMPLEX")
+            FFMPEG_CMD+=(-map "[v_out]")
+            FFMPEG_CMD+=(-map "[a_out]")
+            FFMPEG_CMD+=(-t "$TOTAL_DURATION")
+            FFMPEG_CMD+=(-c:v libx264)
+            FFMPEG_CMD+=(-pix_fmt yuv420p)
+            FFMPEG_CMD+=(-profile:v high)
+            FFMPEG_CMD+=(-preset medium)
+            FFMPEG_CMD+=(-crf 23)
+            FFMPEG_CMD+=(-c:a aac)
+            FFMPEG_CMD+=(-b:a 192k)
+            FFMPEG_CMD+=(-movflags +faststart)
+            FFMPEG_CMD+=(-f mp4)
+            FFMPEG_CMD+=("$output_file_path")
             
             # Execute the command
-            eval "$FFMPEG_CMD"
+            "${FFMPEG_CMD[@]}"
             FFMPEG_EXIT_CODE=$?
         else
             # Case 2: Main Video + Logo Video (no client)
@@ -614,39 +620,34 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             
             # Audio: Handle optional music and silent videos
             if [ -n "$MUSIC" ]; then
-                # shellcheck disable=SC1087
                 FILTER_COMPLEX+="[2:a]afade=t=in:st=0:d=$TRANSITION_DURATION,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
-            elif [ -n "$HAS_AUDIO" ]; then
-                # No music, use video audio [0:a]
-                # shellcheck disable=SC1087
-                FILTER_COMPLEX+="[0:a]atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS,afade=t=out:st=$((TOTAL_DURATION - TRANSITION_DURATION)):d=$TRANSITION_DURATION[a_out]"
             else
-                # No music and no video audio, generate silence
+                # No music, generate silence
                 FILTER_COMPLEX+="anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:$TOTAL_DURATION,asetpts=PTS-STARTPTS[a_out]"
             fi
 
-            FFMPEG_CMD="ffmpeg -v warning"
-            FFMPEG_CMD+=" -i \"$input_video_path\""
-            FFMPEG_CMD+=" -loop 1 -t \"$IMAGE_TIME\" -i \"$LOGO\""
+            FFMPEG_CMD=(ffmpeg -v warning)
+            FFMPEG_CMD+=(-i "$input_video_path")
+            FFMPEG_CMD+=(-loop 1 -t "$IMAGE_TIME" -i "$LOGO")
             if [ -n "$MUSIC" ]; then
-                FFMPEG_CMD+=" -i \"$MUSIC\""
+                FFMPEG_CMD+=(-i "$MUSIC")
             fi
-            FFMPEG_CMD+=" -filter_complex \"$FILTER_COMPLEX\""
-            FFMPEG_CMD+=" -map \"[v_out]\""
-            FFMPEG_CMD+=" -map \"[a_out]\""
-            FFMPEG_CMD+=" -t \"$TOTAL_DURATION\""
-            FFMPEG_CMD+=" -c:v libx264"
-            FFMPEG_CMD+=" -pix_fmt yuv420p"
-            FFMPEG_CMD+=" -profile:v high"
-            FFMPEG_CMD+=" -preset medium"
-            FFMPEG_CMD+=" -crf 23"
-            FFMPEG_CMD+=" -c:a aac"
-            FFMPEG_CMD+=" -b:a 192k"
-            FFMPEG_CMD+=" -movflags +faststart"
-            FFMPEG_CMD+=" -f mp4"
-            FFMPEG_CMD+=" \"$output_file_path\""
+            FFMPEG_CMD+=(-filter_complex "$FILTER_COMPLEX")
+            FFMPEG_CMD+=(-map "[v_out]")
+            FFMPEG_CMD+=(-map "[a_out]")
+            FFMPEG_CMD+=(-t "$TOTAL_DURATION")
+            FFMPEG_CMD+=(-c:v libx264)
+            FFMPEG_CMD+=(-pix_fmt yuv420p)
+            FFMPEG_CMD+=(-profile:v high)
+            FFMPEG_CMD+=(-preset medium)
+            FFMPEG_CMD+=(-crf 23)
+            FFMPEG_CMD+=(-c:a aac)
+            FFMPEG_CMD+=(-b:a 192k)
+            FFMPEG_CMD+=(-movflags +faststart)
+            FFMPEG_CMD+=(-f mp4)
+            FFMPEG_CMD+=("$output_file_path")
 
-            eval "$FFMPEG_CMD"
+            "${FFMPEG_CMD[@]}"
             FFMPEG_EXIT_CODE=$?
         fi
 
@@ -665,7 +666,6 @@ if [ "$processed_count" -eq 0 ]; then
     log_warning "No .mp4 files were found or processed in '$CUTTED_DIR'."
     log_info "Ensure you've made the Shotcut manual cuts and saved videos to that directory."
 else
-	((processed_count--))
     echo "--- All automated conversions complete for event '$EVENT_NAME'! Total files processed: $processed_count ---"
     echo "Final videos are in: $EDITED_DIR"
 fi
