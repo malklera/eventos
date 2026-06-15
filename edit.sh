@@ -271,7 +271,6 @@ echo "Logo image: $LOGO"
 echo "Output to: $EDITED_DIR"
 echo "------------------------------------------------------------------"
 
-# TODO: copy up to here
 processed_count=1
 
 # (Logo duration is now calculated earlier) 
@@ -293,6 +292,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             continue
         fi
 
+        # This is not needed, the formater take sound out
         # Check if the video has an audio stream
         HAS_AUDIO=$(ffprobe -v error -select_streams a -show_entries stream=index -of default=noprint_wrappers=1:nokey=1 "$input_video_path")
         # Determine the structure based on what's provided

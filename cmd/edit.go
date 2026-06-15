@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
-	// "path/filepath"
 
 	"github.com/mitchellh/go-wordwrap"
 	"github.com/spf13/cobra"
@@ -40,8 +40,8 @@ var editCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		videoWidth := 1080
 		// videoHeight := 1920
-		// transitionDuration := 1
-		// clientImgTime := 2
+		transitionDuration := 1
+		clientImgTime := 2
 
 		// Text styling
 		// lineSpacing := 10
@@ -66,17 +66,44 @@ var editCmd = &cobra.Command{
 		if clientText != "" {
 			clientText = wrapText(clientText, fontSize, videoWidth, eventTextMargin)
 		}
-		cutVideos, err := listVideos(cuttedDir)
+
+		cuttedVideos, err := listVideos(cuttedDir)
 		if err != nil {
 			return fmt.Errorf("listVideos(%s): %w", cuttedDir, err)
 		}
 
 		editedCount := 1
-		fmt.Println("Total videos:", len(cutVideos))
-		// for _, file := range cutVideos {
-		// fullPath := filepath.Join(cuttedDir, file.Name())
-		// vDuration, err := videoDuration(fullPath)
-		// }
+		fmt.Println("Total videos:", len(cuttedVideos))
+		for _, file := range cuttedVideos {
+			videoPath := filepath.Join(cuttedDir, file.Name())
+			videoDur, err := videoDuration(videoPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error getting the duration of '%s': %v", videoPath, err)
+				continue
+			}
+			logoDur, err := videoDuration(logo)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error getting the duration of '%s': %v", logo, err)
+				continue
+			}
+
+			// client image + main video + logo
+			if image != "" {
+				preLogoVisualDur := videoDur + clientImgTime
+				totalDur := preLogoVisualDur + logoDur
+				clientFadeOutStart := clientImgTime - transitionDuration
+				videoSlideOutStart := videoDur - transitionDuration
+				videoEndFadeStart := preLogoVisualDur - transitionDuration
+				segmentY := (videoDur - transitionDuration) / 8
+				pLen := (videoDur + 2 * transitionDuration) / 5
+				part1Start := 0
+				part1End := pLen
+
+
+			} else {
+
+			}
+		}
 		fmt.Println("Edited videos:", editedCount)
 		return nil
 	},
