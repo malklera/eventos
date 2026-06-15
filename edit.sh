@@ -178,7 +178,7 @@ if [ -z "$FONT" ]; then
     FONT=$(fc-match -f "%{file}" sans 2>/dev/null)
 fi
 
-if [ -n "$FONT" ] && [ ! -f "$FONT" ]; then
+if [ -z "$FONT" ] || [ ! -f "$FONT" ]; then
     log_error "Error: Font file not found at '$FONT'. Please ensure it's installed or provide a correct path."
     log_info "You can list available fonts with: fc-list | rg .ttf"
     exit 1
@@ -210,13 +210,8 @@ if [ -z "$CLIENT_TEXT" ]; then
 fi
 
 # --- Apply color overrides if provided ---
-if [ -n "$CLIENT_COLOR" ]; then
-    FONT_COLOR="$CLIENT_COLOR"
-fi
-
-if [ -n "$EVENT_COLOR" ]; then
-    FONT_COLOR="$EVENT_COLOR"
-fi
+CLIENT_FONT_COLOR="${CLIENT_COLOR:-$FONT_COLOR}"
+EVENT_FONT_COLOR="${EVENT_COLOR:-$FONT_COLOR}"
 
 # --- Text Wrapping Logic ---
 # Function to wrap text based on estimated character width
@@ -323,8 +318,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             # Fades apply only to the content part (client + input_video), not logo
             VIDEO_END_FADE_START=$((PRE_LOGO_VISUAL_DUR - TRANSITION_DURATION))
             
-            # Reusable segment: y = (x - transition_time) / 8, where x = VIDEO_DURATION
-            SEGMENT_Y=$(( (VIDEO_DURATION - TRANSITION_DURATION) / 8 ))
+
             
             # Divide the entire video duration (including intro/outro transitions) into 5 parts.
             # We add 2 * TRANSITION_DURATION to the total pool to account for the 2 xfade overlaps.
@@ -477,7 +471,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             if [ -n "$EVENT_TEXT" ]; then
                 # Use literal newlines; avoiding complex escaping that causes 'n' artifacts
                 ESC_EVENT_TEXT=$(echo -n "$EVENT_TEXT" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
-                FILTER_COMPLEX+="[$CUR_V]drawtext=text='$ESC_EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:text_align=center:alpha='if(lt(t,$TEXT_FADE_IN_START),0,if(lt(t,$TEXT_FADE_IN_END),(t-$TEXT_FADE_IN_START)/$TRANSITION_DURATION,if(gt(t,$TEXT_FADE_OUT_START),(1-(t-$TEXT_FADE_OUT_START)/$TRANSITION_DURATION),1)))'[v_ev];"
+                FILTER_COMPLEX+="[$CUR_V]drawtext=text='$ESC_EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$EVENT_FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:text_align=center:alpha='if(lt(t,$TEXT_FADE_IN_START),0,if(lt(t,$TEXT_FADE_IN_END),(t-$TEXT_FADE_IN_START)/$TRANSITION_DURATION,if(gt(t,$TEXT_FADE_OUT_START),(1-(t-$TEXT_FADE_OUT_START)/$TRANSITION_DURATION),1)))'[v_ev];"
                 CUR_V="v_ev"
             fi
 
@@ -488,18 +482,18 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
                     # Manual split: two separate drawtext filters for total control as requested
                     if [ -n "$CLIENT_TEXT_UP" ]; then
                         FF_UP=$(echo -n "$CLIENT_TEXT_UP" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
-                        FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_UP':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y-60:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_up];"
+                        FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_UP':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y-60:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$CLIENT_FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_up];"
                         CUR_V="v_up"
                     fi
                     if [ -n "$CLIENT_TEXT_DOWN" ]; then
                         FF_DOWN=$(echo -n "$CLIENT_TEXT_DOWN" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
-                        FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_DOWN':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y+60:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_dw];"
+                        FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_DOWN':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y+60:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$CLIENT_FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_dw];"
                         CUR_V="v_dw"
                     fi
                 else
                     # Fallback to single text (auto-wrapped if needed)
                     FF_CL=$(echo -n "$CLIENT_TEXT" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
-                    FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_CL':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:text_align=center:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_cl];"
+                    FILTER_COMPLEX+="[$CUR_V]drawtext=text='$FF_CL':x=$CLIENT_TEXT_X:y=$CLIENT_TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$CLIENT_FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:text_align=center:alpha='if(lt(t,$CLIENT_TEXT_FADE_OUT_START),1,if(lt(t,$IMAGE_TIME),(1-(t-$CLIENT_TEXT_FADE_OUT_START)/$TRANSITION_DURATION),0))'[v_cl];"
                     CUR_V="v_cl"
                 fi
             fi
@@ -613,7 +607,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             CUR_V="video_combined"
             if [ -n "$EVENT_TEXT" ]; then
                 ESC_EVENT_TEXT=$(echo -n "$EVENT_TEXT" | sed 's/\\/\\\\/g; s/[:'\'']/\\&/g')
-                FILTER_COMPLEX+="[$CUR_V]drawtext=text='$ESC_EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:text_align=center:alpha='if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1)'[v_out];"
+                FILTER_COMPLEX+="[$CUR_V]drawtext=text='$ESC_EVENT_TEXT':x=$TEXT_X:y=$TEXT_Y:fontfile=$FONT:fontsize=$FONT_SIZE:fontcolor=$EVENT_FONT_COLOR:borderw=$BORDER_WIDTH:bordercolor=$BORDER_COLOR:box=1:boxcolor=0x00000088:boxborderw=$BOX_PADDING:line_spacing=$LINE_SPACING:text_align=center:alpha='if(gt(t,$VIDEO_END_FADE_START),(1-(t-$VIDEO_END_FADE_START)/$TRANSITION_DURATION),1)'[v_out];"
             else
                 FILTER_COMPLEX+="[$CUR_V]null[v_out];"
             fi
