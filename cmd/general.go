@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// listVideos return a list of .mp4 files
 func listVideos(path string) ([]os.DirEntry, error) {
 	allFiles, err := os.ReadDir(path)
 	if err != nil {

@@ -128,11 +128,11 @@ var editCmd = &cobra.Command{
 				filterComplex += fmt.Sprintf("[1:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video];", videoW, videoH)
 				// TODO: is this needed? logo is an image i control, with the correct dimensions
 				// logo: scale + fade-in from black
-				filterComplex += fmt.Sprintf("[2:v]scale=%d:%d:foce_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%d[logo];", videoW, videoH, videoW, videoH, transitionT)
+				filterComplex += fmt.Sprintf("[2:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%d[logo];", videoW, videoH, videoW, videoH, transitionT)
 				// Slide-up entrance + slide-out exit for main video (both over TRANSITION_DURATION)
 				// Slide-up: y goes H -> 0 in first TD seconds
 				// Slide-out: y goes 0 -> -H in last TD seconds (slides up off-screen)
-				filterComplex += fmt.Sprintf("color=c=black:s=${%d}x${%d}:d=${%d}:r=30[video_bg];", videoW, videoH, videoT)
+				filterComplex += fmt.Sprintf("color=c=black:s=%dx%d:d=%d:r=30[video_bg];", videoW, videoH, videoT)
 
 				filterComplex += fmt.Sprintf("[video_bg][video]overlay=x=0:y='if(lt(t,%d),H-H*t/%d,if(gt(t,%d),-H*(t-%d)/%d,0))':format=auto[video_slide_raw];", transitionT, transitionT, videoFadeOutStart, videoFadeOutStart, transitionT)
 
@@ -256,8 +256,8 @@ var editCmd = &cobra.Command{
 				// CMD part
 				dstF := filepath.Join(dst, file.Name())
 				fmt.Println("Formateando:", videoPath)
-				ffmpegEdit := make([]string, 44)
-				ffmpegEdit = append(ffmpegEdit, "ffmpeg", "-v", "warning")
+				ffmpegEdit := []string{"ffmpeg", "-v", "warning"}
+				// ffmpegEdit = append(ffmpegEdit, "ffmpeg", "-v", "warning")
 				ffmpegEdit = append(ffmpegEdit, "-loop", "1", strconv.Itoa(imageT), "-i", image)
 				ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
 				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)

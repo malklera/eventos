@@ -27,7 +27,7 @@ var renameCmd = &cobra.Command{
 
 		for n, file := range files {
 			src := filepath.Join("original", file.Name())
-			dst := filepath.Join("renombrado", strconv.Itoa(n)+".mp4")
+			dst := filepath.Join("renombrado", strconv.Itoa(n+1)+".mp4")
 			srcF, err := os.Open(src)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error opening '%s': %v\n", src, err)

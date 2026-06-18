@@ -14,12 +14,31 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "eventos",
 	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Long: `eventos init eventName
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Create Gmail Drive folder for the event, ensure it is private, copy <url>	
+cd eventName
+eventos qr <url>
+
+Copy videos from phone to eventName/original
+cd .../Almacenamiento interno/DCIM/Camera/
+rsync -rtv --progress --inplace --omit-dir-times *.mp4 ~/Videos/eventos/<event-name>/original
+
+eventos rename
+
+eventos format
+
+Cut each video manually and export them to ~/Videos/eventos/event-name/cortado
+In the process take a screenshot of each for the catalog.
+
+Put all images into the "catalogo" directory.
+mv ~/Videos/eventos/<event-name>/cortado/*.png ~/Videos/eventos/<event-name>/catalogo
+cd ~/Videos/eventos/<event-name>/catalogo
+perl-rename -ni 's/^(\d+)-.*/$1.png/' *.png
+See the output of that, if it look ok, remove the -n flag
+
+eventos edit...
+`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
