@@ -256,9 +256,9 @@ var editCmd = &cobra.Command{
 				// CMD part
 				dstF := filepath.Join(dst, file.Name())
 				fmt.Println("Formateando:", videoPath)
-				ffmpegEdit := []string{"ffmpeg", "-v", "warning"}
+				ffmpegEdit := []string{"ffmpeg", "-v", "error"}
 				// ffmpegEdit = append(ffmpegEdit, "ffmpeg", "-v", "warning")
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", strconv.Itoa(imageT), "-i", image)
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", image)
 				ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
 				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)
 
