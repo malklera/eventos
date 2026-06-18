@@ -506,6 +506,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             NEXT_INPUT=3 # Icons start after [2:v] (logo)
         fi
 
+        # TODO: need to copy this
         # Add left icon overlay if provided
         if [ "$ICON_LEFT" != "" ]; then
             ICON_HEIGHT="$FONT_SIZE" # Scale icon to match font size
@@ -524,6 +525,7 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             ((NEXT_INPUT++))
         fi
 
+        # TODO: need to copy this
         # Add right icon overlay if provided
         if [ "$ICON_RIGHT" != "" ]; then
             ICON_HEIGHT="$FONT_SIZE" # Scale icon to match font size
