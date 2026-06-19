@@ -24,8 +24,8 @@ var (
 	clientColor    string
 	textColor      string
 	font           string
-	leftIcon       string
-	rightIcon      string
+	iconLeft       string
+	iconRight      string
 	save           bool
 	run            bool
 )
@@ -72,7 +72,7 @@ var editCmd = &cobra.Command{
 			clientText = clientTextUp + "\n" + clientTextDown
 		}
 
-		// textW := maxLenght(clientText, fontSize)
+		textW := maxLenght(clientText, fontSize)
 
 		cuttedVideos, err := listVideos(cuttedDir)
 		if err != nil {
@@ -236,20 +236,46 @@ var editCmd = &cobra.Command{
 
 				// Identify the audio source and handle optional music/video audio
 				currentStream := "v_with_text"
-				// nextInput := 0
+				nextInput := 0
 				if music != "" {
 					// Music covers the full duration
 					filterComplex += fmt.Sprintf("[3:a]afade=t=in:st=0:d=%d,atrim=0:%d,asetpts=PTS-STARTPTS,afade=t=out:st=%d:d=%d[a_out];", transitionT, totalT, (totalT - transitionT), transitionT)
 					// Icons start after [3:a]
-					// nextInput = 4
+					nextInput = 4
 				} else {
 					// No music, generate silence to prevent ffmpeg crash
 					filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%d,asetpts=PTS-STARTPTS[a_out];", totalT)
 					// Icons start after [2:v] (logo)
-					// nextInput = 3
+					nextInput = 3
 				}
 
-				// TODO: need to copy the icons
+				iconSpacing := 20
+				if iconLeft != "" {
+					// Calculate icon X position: center minus half text width minus icon width minus spacing
+					// Use max(0, ...) to ensure icon stays on screen even if text is wide
+					iconLeftX := fmt.Sprintf("max(0,W/2-%d/2-w-%d)", textW, iconSpacing)
+
+					// Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
+					filterComplex += fmt.Sprintf("[%d:v]scale=-1:%d:force_original_aspect_ratio=decrease,fade=t=out:st=%d:d=%d:alpha=1[icon_left_scaled];", nextInput, fontSize, clientFadeOutStart, transitionT)
+					// Position left icon to the left of the text
+					// Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
+					filterComplex += fmt.Sprintf("[%s][icon_left_scaled]overlay=x='%s':y='(H-h)/1.25':enable='between(t,0,%d)':format=auto[v_with_left];", currentStream, iconLeftX, imageT)
+					currentStream = "v_with_left"
+					nextInput++
+				}
+
+				if iconRight != "" {
+					// Calculate icon X position: center plus half text width plus spacing
+					// Use min(W-w, ...) to ensure icon stays on screen
+					iconRightX := fmt.Sprintf("min(W-w,W/2+%d/2+%d)", textW, iconSpacing)
+
+					// Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
+					filterComplex += fmt.Sprintf("[%d:v]scale=-1:%d:force_original_aspect_ratio=decrease,fade=t=out:st=%d:d=%d:alpha=1[icon_right_scaled];", nextInput, fontSize, clientFadeOutStart, transitionT)
+            // Position right icon to the right of the text
+            // Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
+					filterComplex += fmt.Sprintf("[%s][icon_right_scaled]overlay=x='%s':y='(H-h)/1.25':enable='between(t,0,%d)':format=auto[v_with_right];", currentStream, iconRightX, imageT)
+					currentStream = "v_with_right"
+				}
 
 				filterComplex += fmt.Sprintf("[%s]null[v_out]", currentStream)
 
@@ -266,11 +292,11 @@ var editCmd = &cobra.Command{
 					ffmpegEdit = append(ffmpegEdit, "-i", music)
 				}
 
-				if leftIcon != "" {
-					ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", leftIcon)
+				if iconLeft != "" {
+					ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconLeft)
 				}
-				if rightIcon != "" {
-					ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", rightIcon)
+				if iconRight != "" {
+					ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconRight)
 				}
 
 				ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
@@ -325,8 +351,8 @@ func init() {
 	editCmd.Flags().StringVarP(&clientColor, "client-color", "C", "#E6E70F", "Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
 	editCmd.Flags().StringVarP(&textColor, "text-color", "T", "#E6E70F", "Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
 	editCmd.Flags().StringVarP(&font, "font", "f", "/usr/local/share/fonts/Courgette-Regular.ttf", "Path to font to use for all text (e.g., /usr/share/fonts/TTF/MyFont.ttf).")
-	editCmd.Flags().StringVarP(&leftIcon, "left", "L", "", "Path to icon image to display to the left of client text.")
-	editCmd.Flags().StringVarP(&rightIcon, "right", "R", "", "Path to icon image to display to the right of client text.")
+	editCmd.Flags().StringVarP(&iconLeft, "left", "L", "", "Path to icon image to display to the left of client text.")
+	editCmd.Flags().StringVarP(&iconRight, "right", "R", "", "Path to icon image to display to the right of client text.")
 
 	editCmd.Flags().BoolVarP(&save, "save", "s", false, "Save the current command.")
 	editCmd.Flags().BoolVarP(&run, "run", "r", false, "Run the saved command.")
@@ -394,14 +420,14 @@ func checkArgs() error {
 			return err
 		}
 	}
-	if leftIcon != "" {
-		_, err = os.Stat(leftIcon)
+	if iconLeft != "" {
+		_, err = os.Stat(iconLeft)
 		if err != nil {
 			return err
 		}
 	}
-	if rightIcon != "" {
-		_, err = os.Stat(rightIcon)
+	if iconRight != "" {
+		_, err = os.Stat(iconRight)
 		if err != nil {
 			return err
 		}
@@ -411,13 +437,13 @@ func checkArgs() error {
 
 // maxLenght takes a possibly newline separated string and measure the longest
 // line in it
-// func maxLenght(t string, fontSize int) int {
-// 	parts := strings.Split(t, "\n")
-// 	lenght := 0
-// 	for _, p := range parts {
-// 		if lenght < len(p) {
-// 			lenght = len(p)
-// 		}
-// 	}
-// 	return lenght * fontSize * 7 / 10
-// }
+func maxLenght(t string, fontSize int) int {
+	parts := strings.Split(t, "\n")
+	lenght := 0
+	for _, p := range parts {
+		if lenght < len(p) {
+			lenght = len(p)
+		}
+	}
+	return lenght * fontSize * 7 / 10
+}

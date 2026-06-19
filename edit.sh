@@ -344,7 +344,6 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
 
         echo "Client: ${IMAGE_TIME}s, Video: ${VIDEO_DURATION}s, Logo: ${IMAGE_TIME}s, Total: ${TOTAL_DURATION}s"
 
-        # TODO: up to here
         # Scale and prepare all video inputs
         # Client image: fade out to black at the end
         # shellcheck disable=SC1087
@@ -506,7 +505,6 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             NEXT_INPUT=3 # Icons start after [2:v] (logo)
         fi
 
-        # TODO: need to copy this
         # Add left icon overlay if provided
         if [ "$ICON_LEFT" != "" ]; then
             ICON_HEIGHT="$FONT_SIZE" # Scale icon to match font size
@@ -525,7 +523,6 @@ for input_video_path in "$CUTTED_DIR"/*.mp4; do
             ((NEXT_INPUT++))
         fi
 
-        # TODO: need to copy this
         # Add right icon overlay if provided
         if [ "$ICON_RIGHT" != "" ]; then
             ICON_HEIGHT="$FONT_SIZE" # Scale icon to match font size
