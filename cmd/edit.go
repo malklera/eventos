@@ -271,8 +271,8 @@ var editCmd = &cobra.Command{
 
 					// Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
 					filterComplex += fmt.Sprintf("[%d:v]scale=-1:%d:force_original_aspect_ratio=decrease,fade=t=out:st=%d:d=%d:alpha=1[icon_right_scaled];", nextInput, fontSize, clientFadeOutStart, transitionT)
-            // Position right icon to the right of the text
-            // Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
+					// Position right icon to the right of the text
+					// Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
 					filterComplex += fmt.Sprintf("[%s][icon_right_scaled]overlay=x='%s':y='(H-h)/1.25':enable='between(t,0,%d)':format=auto[v_with_right];", currentStream, iconRightX, imageT)
 					currentStream = "v_with_right"
 				}
@@ -324,8 +324,73 @@ var editCmd = &cobra.Command{
 					editedCount++
 				}
 			} else {
-				// TODO: copy this later
-				continue
+				// Case 2: Main Video + Logo Video (no client)
+				totalT := videoT + imageT + transitionT
+				logoTransitionStart := videoT + transitionT
+				videoEndFadeStart := videoT + transitionT
+
+				fmt.Printf("Client: %d, Video: %d, Logo: %d, Total: %d\n", imageT, videoT, imageT, (imageT + videoT + imageT))
+
+				// Scale and prepare video inputs
+				filterComplex := fmt.Sprintf("[0:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video_raw];", videoW, videoH)
+				filterComplex += "[1:v]fps=30,setpts=PTS-STARTPTS[logo];"
+
+				// Transition from input_video to logo
+				filterComplex += fmt.Sprintf("[video_raw][logo]xfade=transition=fade:duration=%d:offset=%d[video_combined];", transitionT, logoTransitionStart)
+
+				// --- Dynamic Text Overlay Logic (Case 2) ---
+				curV := "video_combined"
+				if eventText != "" {
+					filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:line_spacing=%d:text_align=center:alpha='if(gt(t,%d),(1-(t-%d)/%d),1)'[v_out];", curV, eventText, eventTextX, eventTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, lineSpacing, videoEndFadeStart, videoEndFadeStart, transitionT)
+				} else {
+					filterComplex += fmt.Sprintf("[%s]null[v_out];", curV)
+				}
+
+				// Audio: Handle optional music and silent videos
+				if music != "" {
+					// Music covers the full duration
+					filterComplex += fmt.Sprintf("[2:a]afade=t=in:st=0:d=%d,atrim=0:%d,asetpts=PTS-STARTPTS,afade=t=out:st=%d:d=%d[a_out];", transitionT, totalT, (totalT - transitionT), transitionT)
+				} else {
+					// No music, generate silence to prevent ffmpeg crash
+					filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%d,asetpts=PTS-STARTPTS[a_out];", totalT)
+				}
+
+				// CMD part
+				dstF := filepath.Join(dst, file.Name())
+				fmt.Println("Formateando:", videoPath)
+				ffmpegEdit := []string{"ffmpeg", "-v", "error"}
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", image)
+				ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)
+
+				if music != "" {
+					ffmpegEdit = append(ffmpegEdit, "-i", music)
+				}
+
+				ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
+				ffmpegEdit = append(ffmpegEdit, "-map", "[v_out]")
+				ffmpegEdit = append(ffmpegEdit, "-map", "[a_out]")
+				ffmpegEdit = append(ffmpegEdit, "-t", strconv.Itoa(totalT))
+				ffmpegEdit = append(ffmpegEdit, "-c:v", "libx264")
+				ffmpegEdit = append(ffmpegEdit, "-pix_fmt", "yuv420p")
+				ffmpegEdit = append(ffmpegEdit, "-profile:v", "high")
+				ffmpegEdit = append(ffmpegEdit, "-preset", "medium")
+				ffmpegEdit = append(ffmpegEdit, "-crf", "23")
+				ffmpegEdit = append(ffmpegEdit, "-c:a", "aac")
+				ffmpegEdit = append(ffmpegEdit, "-b:a", "192k")
+				ffmpegEdit = append(ffmpegEdit, "-movflags", "+faststart")
+				ffmpegEdit = append(ffmpegEdit, "-f", "mp4")
+				ffmpegEdit = append(ffmpegEdit, dstF)
+
+				ffmpeg := exec.Command(ffmpegEdit[0], ffmpegEdit[1:]...)
+				ffmpeg.Stdout = os.Stdout
+				ffmpeg.Stderr = os.Stderr
+				err := ffmpeg.Run()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error running %s: %v\n", ffmpeg.String(), err)
+				} else {
+					editedCount++
+				}
 			}
 		}
 		fmt.Println("Total videos:", len(cuttedVideos))
