@@ -112,20 +112,18 @@ var editCmd = &cobra.Command{
 
 			totalT := 0
 
-			// client image + main video + logo
+			// client image + crossfade + main video + fade out + logo
 			if image != "" {
 				preLogoVisualT := imageT + videoT
 				totalT = preLogoVisualT + imageT
 				clientFadeOutStart := imageT - transitionT
 				videoFadeOutStart := videoT - transitionT
 				videoEndFadeStart := preLogoVisualT - transitionT
-				// segmentY := (videoT - transitionT) / 8
 				pLen := (videoT + 2*transitionT) / 5
 
-				// part1Start := 0
 				part1End := pLen
 
-				// xfade 1 setup: part1 and part2 overlap by transitionDuration
+				// xfade 1 setup: part1 and part2 overlap by transitionT
 				part2Start := part1End - transitionT
 				part2End := part2Start + pLen
 
@@ -136,11 +134,11 @@ var editCmd = &cobra.Command{
 				part4End := part4Start + pLen
 
 				part5Start := part4End - transitionT
-				// part5End := videoT
 
 				textFadeInStart := imageT - transitionT
 				textFadeInEnd := imageT
 				textFadeOutStart := videoEndFadeStart
+
 				fmt.Printf("Client: %d, Video: %d, Logo: %d, Total: %d\n", imageT, videoT, imageT, (imageT + videoT + imageT))
 
 				// Scale and prepare all video inputs
@@ -148,6 +146,8 @@ var editCmd = &cobra.Command{
 				filterComplex := fmt.Sprintf("[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,fade=t=out:st=%d:d=%d[client];", videoW, videoH, videoW, videoH, clientFadeOutStart, transitionT)
 				filterComplex += fmt.Sprintf("[1:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video];", videoW, videoH)
 				// TODO: is this needed? logo is an image i control, with the correct dimensions
+				// use this??
+// filterComplex += fmt.Sprintf("[2:v]fps=30,setpts=PTS-STARTPTS,fade=t=in:st=0:d=%d[logo];", transitionT)
 				// logo: scale + fade-in from black
 				filterComplex += fmt.Sprintf("[2:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%d[logo];", videoW, videoH, videoW, videoH, transitionT)
 				// Slide-up entrance + slide-out exit for main video (both over TRANSITION_DURATION)
@@ -303,7 +303,7 @@ var editCmd = &cobra.Command{
 				ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
 
 			} else {
-				// Case 2: Main Video + Logo Video (no client)
+				// Case 2: main video + fade out + logo video (no client)
 				totalT = videoT + transitionT + imageT
 				logoTransitionStart := videoT + transitionT
 				videoEndFadeStart := videoT + transitionT
