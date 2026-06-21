@@ -91,10 +91,31 @@ var editCmd = &cobra.Command{
 				continue
 			}
 
+			// CMD part
+			dstF := filepath.Join(dst, file.Name())
+			fmt.Println("Formateando:", videoPath)
+			ffmpegEdit := []string{"ffmpeg", "-v", "error"}
+			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", image)
+			ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
+			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)
+
+			if music != "" {
+				ffmpegEdit = append(ffmpegEdit, "-i", music)
+			}
+
+			if iconLeft != "" {
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconLeft)
+			}
+			if iconRight != "" {
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconRight)
+			}
+
+			totalT := 0
+
 			// client image + main video + logo
 			if image != "" {
-				preLogoVisualT := videoT + imageT
-				totalT := preLogoVisualT + imageT
+				preLogoVisualT := imageT + videoT
+				totalT = preLogoVisualT + imageT
 				clientFadeOutStart := imageT - transitionT
 				videoFadeOutStart := videoT - transitionT
 				videoEndFadeStart := preLogoVisualT - transitionT
@@ -279,53 +300,11 @@ var editCmd = &cobra.Command{
 
 				filterComplex += fmt.Sprintf("[%s]null[v_out]", currentStream)
 
-				// CMD part
-				dstF := filepath.Join(dst, file.Name())
-				fmt.Println("Formateando:", videoPath)
-				ffmpegEdit := []string{"ffmpeg", "-v", "error"}
-				// ffmpegEdit = append(ffmpegEdit, "ffmpeg", "-v", "warning")
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", image)
-				ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)
-
-				if music != "" {
-					ffmpegEdit = append(ffmpegEdit, "-i", music)
-				}
-
-				if iconLeft != "" {
-					ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconLeft)
-				}
-				if iconRight != "" {
-					ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconRight)
-				}
-
 				ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
-				ffmpegEdit = append(ffmpegEdit, "-map", "[v_out]")
-				ffmpegEdit = append(ffmpegEdit, "-map", "[a_out]")
-				ffmpegEdit = append(ffmpegEdit, "-t", strconv.Itoa(totalT))
-				ffmpegEdit = append(ffmpegEdit, "-c:v", "libx264")
-				ffmpegEdit = append(ffmpegEdit, "-pix_fmt", "yuv420p")
-				ffmpegEdit = append(ffmpegEdit, "-profile:v", "high")
-				ffmpegEdit = append(ffmpegEdit, "-preset", "medium")
-				ffmpegEdit = append(ffmpegEdit, "-crf", "23")
-				ffmpegEdit = append(ffmpegEdit, "-c:a", "aac")
-				ffmpegEdit = append(ffmpegEdit, "-b:a", "192k")
-				ffmpegEdit = append(ffmpegEdit, "-movflags", "+faststart")
-				ffmpegEdit = append(ffmpegEdit, "-f", "mp4")
-				ffmpegEdit = append(ffmpegEdit, dstF)
 
-				ffmpeg := exec.Command(ffmpegEdit[0], ffmpegEdit[1:]...)
-				ffmpeg.Stdout = os.Stdout
-				ffmpeg.Stderr = os.Stderr
-				err := ffmpeg.Run()
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error running %s: %v\n", ffmpeg.String(), err)
-				} else {
-					editedCount++
-				}
 			} else {
 				// Case 2: Main Video + Logo Video (no client)
-				totalT := videoT + imageT + transitionT
+				totalT = videoT + transitionT + imageT
 				logoTransitionStart := videoT + transitionT
 				videoEndFadeStart := videoT + transitionT
 
@@ -355,42 +334,31 @@ var editCmd = &cobra.Command{
 					filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%d,asetpts=PTS-STARTPTS[a_out];", totalT)
 				}
 
-				// CMD part
-				dstF := filepath.Join(dst, file.Name())
-				fmt.Println("Formateando:", videoPath)
-				ffmpegEdit := []string{"ffmpeg", "-v", "error"}
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", image)
-				ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)
-
-				if music != "" {
-					ffmpegEdit = append(ffmpegEdit, "-i", music)
-				}
-
 				ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
-				ffmpegEdit = append(ffmpegEdit, "-map", "[v_out]")
-				ffmpegEdit = append(ffmpegEdit, "-map", "[a_out]")
-				ffmpegEdit = append(ffmpegEdit, "-t", strconv.Itoa(totalT))
-				ffmpegEdit = append(ffmpegEdit, "-c:v", "libx264")
-				ffmpegEdit = append(ffmpegEdit, "-pix_fmt", "yuv420p")
-				ffmpegEdit = append(ffmpegEdit, "-profile:v", "high")
-				ffmpegEdit = append(ffmpegEdit, "-preset", "medium")
-				ffmpegEdit = append(ffmpegEdit, "-crf", "23")
-				ffmpegEdit = append(ffmpegEdit, "-c:a", "aac")
-				ffmpegEdit = append(ffmpegEdit, "-b:a", "192k")
-				ffmpegEdit = append(ffmpegEdit, "-movflags", "+faststart")
-				ffmpegEdit = append(ffmpegEdit, "-f", "mp4")
-				ffmpegEdit = append(ffmpegEdit, dstF)
+			}
 
-				ffmpeg := exec.Command(ffmpegEdit[0], ffmpegEdit[1:]...)
-				ffmpeg.Stdout = os.Stdout
-				ffmpeg.Stderr = os.Stderr
-				err := ffmpeg.Run()
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error running %s: %v\n", ffmpeg.String(), err)
-				} else {
-					editedCount++
-				}
+			ffmpegEdit = append(ffmpegEdit, "-map", "[v_out]")
+			ffmpegEdit = append(ffmpegEdit, "-map", "[a_out]")
+			ffmpegEdit = append(ffmpegEdit, "-t", strconv.Itoa(totalT))
+			ffmpegEdit = append(ffmpegEdit, "-c:v", "libx264")
+			ffmpegEdit = append(ffmpegEdit, "-pix_fmt", "yuv420p")
+			ffmpegEdit = append(ffmpegEdit, "-profile:v", "high")
+			ffmpegEdit = append(ffmpegEdit, "-preset", "medium")
+			ffmpegEdit = append(ffmpegEdit, "-crf", "23")
+			ffmpegEdit = append(ffmpegEdit, "-c:a", "aac")
+			ffmpegEdit = append(ffmpegEdit, "-b:a", "192k")
+			ffmpegEdit = append(ffmpegEdit, "-movflags", "+faststart")
+			ffmpegEdit = append(ffmpegEdit, "-f", "mp4")
+			ffmpegEdit = append(ffmpegEdit, dstF)
+
+			ffmpeg := exec.Command(ffmpegEdit[0], ffmpegEdit[1:]...)
+			ffmpeg.Stdout = os.Stdout
+			ffmpeg.Stderr = os.Stderr
+			err = ffmpeg.Run()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error running %s: %v\n", ffmpeg.String(), err)
+			} else {
+				editedCount++
 			}
 		}
 		fmt.Println("Total videos:", len(cuttedVideos))
@@ -408,6 +376,7 @@ func init() {
 	editCmd.Flags().StringVarP(&image, "image", "i", "", "Client image file name, file has to be inside <event-name>/.")
 	editCmd.Flags().StringVarP(&eventText, "text", "t", "", "Text to overlay on the whole video.")
 
+	// TODO: only allow clientText if there is a image
 	editCmd.Flags().StringVarP(&clientText, "client", "c", "", "Client text to display over client image.")
 	editCmd.Flags().StringVarP(&clientTextUp, "up", "u", "", "Upper line of client text (manual split, bypasses auto-wrap).")
 	editCmd.MarkFlagsMutuallyExclusive("client", "up")
@@ -416,6 +385,7 @@ func init() {
 	editCmd.Flags().StringVarP(&clientColor, "client-color", "C", "#E6E70F", "Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
 	editCmd.Flags().StringVarP(&textColor, "text-color", "T", "#E6E70F", "Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
 	editCmd.Flags().StringVarP(&font, "font", "f", "/usr/local/share/fonts/Courgette-Regular.ttf", "Path to font to use for all text (e.g., /usr/share/fonts/TTF/MyFont.ttf).")
+	// TODO: how do i make that icons are only allowed if there is clientText?
 	editCmd.Flags().StringVarP(&iconLeft, "left", "L", "", "Path to icon image to display to the left of client text.")
 	editCmd.Flags().StringVarP(&iconRight, "right", "R", "", "Path to icon image to display to the right of client text.")
 
