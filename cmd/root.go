@@ -23,8 +23,7 @@ Create Gmail Drive folder for the event, ensure it is private, copy <url>
 
 Copy videos from phone to eventName/original
 
-	cd .../Almacenamiento interno/DCIM/Camera/
-	rsync -rtv --progress --inplace --omit-dir-times *.mp4 ~/Videos/eventos/<event-name>/original
+	eventos copy <path to phone videos directory> <event-name>
 
 	eventos rename
 
