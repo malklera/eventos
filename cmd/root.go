@@ -1,6 +1,4 @@
-/*
-Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-*/
+// Package cmd contains all logic regarding the eventos command
 package cmd
 
 import (
@@ -13,28 +11,34 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "eventos",
-	Short: "A brief description of your application",
-	Long: `eventos init eventName
+	Short: "Suit to manage videos from 360 platform.",
+	Long: `Steps to follow.
+
+	eventos init eventName
 
 Create Gmail Drive folder for the event, ensure it is private, copy <url>	
-cd eventName
-eventos qr <url>
+
+	cd eventName
+	eventos qr <url>
 
 Copy videos from phone to eventName/original
-cd .../Almacenamiento interno/DCIM/Camera/
-rsync -rtv --progress --inplace --omit-dir-times *.mp4 ~/Videos/eventos/<event-name>/original
 
-eventos rename
+	cd .../Almacenamiento interno/DCIM/Camera/
+	rsync -rtv --progress --inplace --omit-dir-times *.mp4 ~/Videos/eventos/<event-name>/original
 
-eventos format
+	eventos rename
+
+	eventos format
 
 Cut each video manually and export them to ~/Videos/eventos/event-name/cortado
 In the process take a screenshot of each for the catalog.
 
 Put all images into the "catalogo" directory.
-mv ~/Videos/eventos/<event-name>/cortado/*.png ~/Videos/eventos/<event-name>/catalogo
-cd ~/Videos/eventos/<event-name>/catalogo
-perl-rename -ni 's/^(\d+)-.*/$1.png/' *.png
+
+	mv ~/Videos/eventos/<event-name>/cortado/*.png ~/Videos/eventos/<event-name>/catalogo
+	cd ~/Videos/eventos/<event-name>/catalogo
+	perl-rename -ni 's/^(\d+)-.*/$1.png/' *.png
+
 See the output of that, if it look ok, remove the -n flag
 
 eventos edit...
