@@ -27,22 +27,22 @@ func listVideos(path string) ([]os.DirEntry, error) {
 func copyFile(src string, dst string) error {
 	srcF, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("os.Open(%s): %v\n", src, err)
+		return fmt.Errorf("os.Open(%s): %v", src, err)
 	}
 	defer srcF.Close()
 
 	dstF, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("os.Create(%s): %v\n", src, err)
+		return fmt.Errorf("os.Create(%s): %v", dst, err)
 	}
 	defer dstF.Close()
 
 	_, err = io.Copy(dstF, srcF)
 	if err != nil {
-		return fmt.Errorf("io.Copy(%s, %s): %v\n", src, dst, err)
+		return fmt.Errorf("io.Copy(%s, %s): %v", srcF.Name(), dstF.Name(), err)
 	}
 	if err := dstF.Sync(); err != nil {
-		return fmt.Errorf("dstF.Sync(): %v\n", err)
+		return fmt.Errorf("dstF.Sync(): %v", err)
 	}
 	return nil
 }

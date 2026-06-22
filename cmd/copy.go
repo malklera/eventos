@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 	"os"
 	"path/filepath"
 
@@ -26,18 +27,22 @@ var copyCmd = &cobra.Command{
 
 		fmt.Println("Total src videos:", len(files))
 		count := 0
-		originals := filepath.Join("~/Videos/eventos", args[1])
+		evento := filepath.Join("/home/malklera/Videos/eventos", args[1])
+		original := filepath.Join(evento, "original")
+		start := time.Now()
 		for _, file := range files {
 			src := filepath.Join(args[0], file.Name())
-			dst := filepath.Join(originals, file.Name())
+			dst := filepath.Join(original, file.Name())
 			err := copyFile(src, dst)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "copyFile(%s, %s): %v\n", src, dst, err)
 			} else {
 				count++
+				fmt.Println("Copied:", src)
 			}
 		}
 		fmt.Println("Total copied:", count)
+		fmt.Println("Time taken:", time.Since(start))
 		return nil
 	},
 }
