@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -28,24 +27,9 @@ var renameCmd = &cobra.Command{
 		for n, file := range files {
 			src := filepath.Join("original", file.Name())
 			dst := filepath.Join("renombrado", strconv.Itoa(n+1)+".mp4")
-			srcF, err := os.Open(src)
+			err := copyFile(src, dst)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error opening '%s': %v\n", src, err)
-			}
-			defer srcF.Close()
-
-			dstF, err := os.Create(dst)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error creating '%s': %v\n", src, err)
-			}
-			defer dstF.Close()
-
-			_, err = io.Copy(dstF, srcF)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error copying '%s' to '%s': %v\n", src, dst, err)
-			}
-			if err := dstF.Sync(); err != nil {
-				fmt.Fprintf(os.Stderr, "error dstF.Sync(): %v\n", err)
+				fmt.Fprintf(os.Stderr, "copyFile(%s, %s): %v\n", src, dst, err)
 			}
 		}
 		return nil
