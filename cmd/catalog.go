@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,7 +22,7 @@ var catalogCmd = &cobra.Command{
 		for _, file := range files {
 			if strings.HasSuffix(file.Name(), ".png") {
 				number, _, _ := strings.Cut(file.Name(), "-")
-				err := os.Rename(file.Name(), number+".png")
+				err := os.Rename(filepath.Join("cortado", file.Name()), filepath.Join("catalogo", number+".png"))
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "os.Rename(%s, %s+\".png\"): %v\n", file.Name(), number, err)
 				}
