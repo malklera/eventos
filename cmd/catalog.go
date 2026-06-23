@@ -22,9 +22,11 @@ var catalogCmd = &cobra.Command{
 		for _, file := range files {
 			if strings.HasSuffix(file.Name(), ".png") {
 				number, _, _ := strings.Cut(file.Name(), "-")
-				err := os.Rename(filepath.Join("cortado", file.Name()), filepath.Join("catalogo", number+".png"))
+				src := filepath.Join("cortado", file.Name())
+				dst := filepath.Join("catalogo", number+".png")
+				err := os.Rename(src, dst)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "os.Rename(%s, %s+\".png\"): %v\n", file.Name(), number, err)
+					fmt.Fprintf(os.Stderr, "os.Rename(%s, %s): %v\n", src, dst, err)
 				}
 			}
 		}
