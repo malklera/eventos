@@ -58,7 +58,6 @@ var editCmd = &cobra.Command{
 		eventTextMargin := 100
 
 		cuttedDir := "cortado"
-		// editedDir := "editado"
 
 		// If eventText is not empty, wrap it as needed
 		if eventText != "" {
@@ -82,10 +81,18 @@ var editCmd = &cobra.Command{
 		editedCount := 0
 		start := time.Now()
 		dst := "editado"
+		musicT := 0
+		if music != "" {
+			var err error
+			musicT, err = fileDuration(music)
+			if err != nil {
+				return fmt.Errorf("fileDuration(%s): %w", music, err)
+			}
+		}
 
 		for _, file := range cuttedVideos {
 			videoPath := filepath.Join(cuttedDir, file.Name())
-			videoT, err := videoDuration(videoPath)
+			videoT, err := fileDuration(videoPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error getting the duration of '%s': %v", videoPath, err)
 				continue
@@ -100,6 +107,10 @@ var editCmd = &cobra.Command{
 			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)
 
 			if music != "" {
+				if musicT < (videoT + 2*imageT) {
+					fmt.Fprintf(os.Stderr, "Error: music too short, musicT: %d, totalT: %d\n", musicT, (videoT + 2*imageT))
+					continue
+				}
 				ffmpegEdit = append(ffmpegEdit, "-i", music)
 			}
 
@@ -147,7 +158,7 @@ var editCmd = &cobra.Command{
 				filterComplex += fmt.Sprintf("[1:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video];", videoW, videoH)
 				// TODO: is this needed? logo is an image i control, with the correct dimensions
 				// use this??
-// filterComplex += fmt.Sprintf("[2:v]fps=30,setpts=PTS-STARTPTS,fade=t=in:st=0:d=%d[logo];", transitionT)
+				// filterComplex += fmt.Sprintf("[2:v]fps=30,setpts=PTS-STARTPTS,fade=t=in:st=0:d=%d[logo];", transitionT)
 				// logo: scale + fade-in from black
 				filterComplex += fmt.Sprintf("[2:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%d[logo];", videoW, videoH, videoW, videoH, transitionT)
 				// Slide-up entrance + slide-out exit for main video (both over TRANSITION_DURATION)
@@ -404,15 +415,15 @@ func wrapText(text string, fontSize int, videoW int, margin int) string {
 	return wordwrap.WrapString(text, uint((videoW-margin)/(fontSize*7/10)))
 }
 
-// videoDuration take a path and run ffprobe to learn its duration, return the quotient and any error
-func videoDuration(path string) (int, error) {
+// fileDuration take a path and run ffprobe to learn its duration, return the quotient and any error
+func fileDuration(path string) (int, error) {
 	// TODO: change to return a float
 	ffprobe := exec.Command("ffprobe",
 		"-loglevel",
 		"error",
 		"-show_entries",
 		"format=duration",
-		"-output_format",
+		"-print_format",
 		"default=noprint_wrappers=1:nokey=1",
 		path)
 	ffprobe.Stderr = os.Stderr
