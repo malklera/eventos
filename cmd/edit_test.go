@@ -16,7 +16,7 @@ func TestVideoDuration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			out, err := videoDuration(tt.path)
+			out, err := fileDuration(tt.path)
 			if out != tt.outWant || err != tt.errWant {
 				t.Errorf("got '%d' and '%v'\nwant '%d' and '%v'", out, err, tt.outWant, tt.errWant)
 			}
