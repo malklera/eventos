@@ -1,15 +1,30 @@
 # Eventos
 
-Commands:
-- help
-- init -t --target [path] [name app]
-- qr
-- rename
-- format
-- edit 
-- copy: use the rsync go library to copy the files
-- catalog: copy all screenshots from the cortado directory to catalogo, rename
-them the same as the origin video
+This CLI is used to manage and edit videos used in the 360 Platform service by
+(https://www.instagram.com/mimbi_glitterbar)[Mimbi Glitter & Tattoo].
 
-- Add a check that the length of music is at least equal to the video
-- version, check the blog post in feeder to do it.
+To install.
+
+```sh
+TAG=$(git describe --tags --exact-match 2>/dev/null || echo dev)
+go install -ldflags "-X 'main.tag=$TAG'"
+```
+
+To use read the steps given by `eventos help`.
+
+---
+
+Video from camera
+
+Resolution: 1080x1920 30 fps
+
+---
+
+Contact info
+Instagram: https://www.instagram.com/mimbi_glitterbar
+WhatsApp: 343-5362802
+
+Image with contact info
+Resolution: 1080x1920
+Font: Works Sans regular
+Font size: 110

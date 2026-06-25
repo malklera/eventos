@@ -11,7 +11,7 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "eventos",
-	Short: "Suit to manage videos from 360 platform.",
+	Short: "Manage videos from 360 platform.",
 	Long: `Steps to follow.
 
 	eventos init eventName
@@ -23,24 +23,18 @@ Create Gmail Drive folder for the event, ensure it is private, copy <url>
 
 Copy videos from phone to eventName/original
 
-	eventos copy <path to phone videos directory> <event-name>
+	eventos copy <"path to phone videos directory"> <eventName>
 
 	eventos rename
 
 	eventos format
 
-Cut each video manually and export them to ~/Videos/eventos/event-name/cortado
+Cut each video manually and export them to ~/Videos/eventos/eventName/cortado
 In the process take a screenshot of each for the catalog.
 
-Put all images into the "catalogo" directory.
+	eventos catalog
 
-	mv ~/Videos/eventos/<event-name>/cortado/*.png ~/Videos/eventos/<event-name>/catalogo
-	cd ~/Videos/eventos/<event-name>/catalogo
-	perl-rename -ni 's/^(\d+)-.*/$1.png/' *.png
-
-See the output of that, if it look ok, remove the -n flag
-
-eventos edit...
+	eventos edit
 `,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
