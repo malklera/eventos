@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,8 @@ var (
 	run            bool
 )
 
+var colorRe = regexp.MustCompile(`^0x[0-9A-Fa-f]{6}$`)
+
 // editCmd represents the edit command
 var editCmd = &cobra.Command{
 	Use:   "edit",
@@ -47,9 +50,9 @@ var editCmd = &cobra.Command{
 		// Text styling
 		lineSpacing := 10
 		fontSize := 80
-		fontColor := "#E6E70F"
+		fontColor := "0xE6E70F"
 		borderW := 2
-		borderColor := "#000000"
+		borderColor := "0x000000"
 		boxPadding := 8
 		clientTextX := "(w-tw)/2"
 		clientTextY := "(h-th)/1.25"
@@ -393,8 +396,8 @@ func init() {
 	editCmd.MarkFlagsMutuallyExclusive("client", "up")
 
 	editCmd.Flags().StringVarP(&clientTextDown, "down", "d", "", "Lower line of client text (manual split, bypasses auto-wrap).")
-	editCmd.Flags().StringVarP(&clientColor, "client-color", "C", "#E6E70F", "Client text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
-	editCmd.Flags().StringVarP(&textColor, "text-color", "T", "#E6E70F", "Event text color in hex format (e.g., \"#FFFFFF\" or \"#E6E70F\").")
+	editCmd.Flags().StringVarP(&clientColor, "client-color", "C", "0xE6E70F", "Client text color in hex format (e.g., \"0xFFFFFF\" or \"0xE6E70F\").")
+	editCmd.Flags().StringVarP(&textColor, "text-color", "T", "0xE6E70F", "Event text color in hex format (e.g., \"0xFFFFFF\" or \"0xE6E70F\").")
 	editCmd.Flags().StringVarP(&font, "font", "f", "/usr/local/share/fonts/Courgette-Regular.ttf", "Path to font to use for all text (e.g., /usr/share/fonts/TTF/MyFont.ttf).")
 	// TODO: how do i make that icons are only allowed if there is clientText?
 	editCmd.Flags().StringVarP(&iconLeft, "left", "L", "", "Path to icon image to display to the left of client text.")
@@ -478,6 +481,19 @@ func checkArgs() error {
 			return err
 		}
 	}
+
+	if clientColor != "" {
+		if !colorRe.MatchString(clientColor) {
+			return fmt.Errorf("'%s' is an invalid color, use e.g. '0xRRGGBB'", clientColor)
+		}
+	}
+
+	if textColor != "" {
+		if !colorRe.MatchString(textColor) {
+			return fmt.Errorf("'%s' is an invalid color, use e.g. '0xRRGGBB'", textColor)
+		}
+	}
+
 	return nil
 }
 
