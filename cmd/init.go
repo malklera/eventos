@@ -10,17 +10,16 @@ import (
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
-	// TODO: add the target flag to operate in other place instead of where the
-	// command is run
 	Use:   "init",
 	Short: "Create the required directories to contain the event",
-	Long:  `e.g. eventos init eventName`,
-	Args:  cobra.ExactArgs(1),
+	Long: `e.g. eventos init eventName
+	eventos init ~/Videos/eventos/eventName`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		event := args[0]
 		err := os.Mkdir(event, 0750)
 		if err != nil {
-			fmt.Println("error:", err)
+			return fmt.Errorf("failed to init: %w", err)
 		}
 		err2 := os.Mkdir(filepath.Join(event, "original"), 0750)
 		err3 := os.Mkdir(filepath.Join(event, "renombrado"), 0750)
@@ -35,7 +34,7 @@ var initCmd = &cobra.Command{
 			err6 != nil ||
 			err7 != nil {
 			if err := os.RemoveAll(event); err != nil {
-				return err
+				return fmt.Errorf("failed to init: %w", err)
 			}
 		}
 		return nil
