@@ -44,8 +44,8 @@ var editCmd = &cobra.Command{
 		}
 		videoW := 1080
 		videoH := 1920
-		transitionT := 1
-		imageT := 2
+		transitionT := 1.0
+		imageT := 2.0
 
 		// Text styling
 		lineSpacing := 10
@@ -84,7 +84,7 @@ var editCmd = &cobra.Command{
 		editedCount := 0
 		start := time.Now()
 		dst := "editado"
-		musicT := 0
+		musicT := 0.0
 		if music != "" {
 			var err error
 			musicT, err = fileDuration(music)
@@ -105,9 +105,9 @@ var editCmd = &cobra.Command{
 			dstF := filepath.Join(dst, file.Name())
 			fmt.Println("Formateando:", videoPath)
 			ffmpegEdit := []string{"ffmpeg", "-v", "error"}
-			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", image)
+			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", image)
 			ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
-			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", logo)
+			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", logo)
 
 			if music != "" {
 				if musicT < (videoT + 2*imageT) {
@@ -118,13 +118,13 @@ var editCmd = &cobra.Command{
 			}
 
 			if iconLeft != "" {
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconLeft)
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", iconLeft)
 			}
 			if iconRight != "" {
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.Itoa(imageT), "-i", iconRight)
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", iconRight)
 			}
 
-			totalT := 0
+			totalT := 0.0
 
 			// client image + crossfade + main video + fade out + logo
 			if image != "" {
@@ -353,7 +353,7 @@ var editCmd = &cobra.Command{
 
 			ffmpegEdit = append(ffmpegEdit, "-map", "[v_out]")
 			ffmpegEdit = append(ffmpegEdit, "-map", "[a_out]")
-			ffmpegEdit = append(ffmpegEdit, "-t", strconv.Itoa(totalT))
+			ffmpegEdit = append(ffmpegEdit, "-t", strconv.FormatFloat(totalT, 'f', -1, 64))
 			ffmpegEdit = append(ffmpegEdit, "-c:v", "libx264")
 			ffmpegEdit = append(ffmpegEdit, "-pix_fmt", "yuv420p")
 			ffmpegEdit = append(ffmpegEdit, "-profile:v", "high")
@@ -383,8 +383,6 @@ var editCmd = &cobra.Command{
 }
 
 func init() {
-	// Do not really need this i think, at least for now.
-	// editCmd.Flags().String("event", "e", "", "Name of the event.")
 	editCmd.Flags().StringVarP(&logo, "logo", "l", "", "Path to logo image file (~/Videos/eventos/assets/logo/myLogo.png).")
 	editCmd.Flags().StringVarP(&music, "music", "m", "", "Path to music file (~/Videos/eventos/assets/musica/cortado/myMusic.mp3).")
 	editCmd.Flags().StringVarP(&image, "image", "i", "", "Client image file name, file has to be inside <event-name>/.")
@@ -419,7 +417,7 @@ func wrapText(text string, fontSize int, videoW int, margin int) string {
 }
 
 // fileDuration take a path and run ffprobe to learn its duration, return the quotient and any error
-func fileDuration(path string) (int, error) {
+func fileDuration(path string) (float64, error) {
 	// TODO: change to return a float
 	ffprobe := exec.Command("ffprobe",
 		"-loglevel",
@@ -434,8 +432,7 @@ func fileDuration(path string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("ffprobe.Run(%s): %w", ffprobe.String(), err)
 	}
-	str, _, _ := strings.Cut(string(out), ".")
-	dur, err := strconv.Atoi(str)
+	dur, err := strconv.ParseFloat(string(out), 64)
 	if err != nil {
 		return 0, fmt.Errorf("strconv.Atoi(string(%v)): %w", out, err)
 	}

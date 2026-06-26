@@ -38,7 +38,7 @@ my mind, not going to do this.
 
 [x] In init command allow to pass a path.
 
-[ ] Change the durations to return float64 instead of int.
+[x] Change the durations to return float64 instead of int.
 
 [ ] Validate that all arguments of edit are valid, files exist, color are the correct format.
 
@@ -46,3 +46,9 @@ my mind, not going to do this.
 
 [ ] Improve error message for init, and provably other commands, "eventos init"
 indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
+
+[ ] Passing clientColor flag is only valid with clientText
+
+[ ] Passing textColor flag is only valid with eventText
+
+[ ] Implement -run and -save flags.
