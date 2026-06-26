@@ -1,7 +1,7 @@
 # Eventos
 
 This CLI is used to manage and edit videos used in the 360 Platform service by
-(https://www.instagram.com/mimbi_glitterbar)[Mimbi Glitter & Tattoo].
+[https://www.instagram.com/mimbi_glitterbar](Mimbi Glitter & Tattoo).
 
 To install.
 
@@ -33,7 +33,8 @@ Font size: 110
 
 # TODO
 
-[ ] Add command or flag to point to the assets like "1 - Indicaciones.odt"
+[x] Add command or flag to point to the assets like "1 - Indicaciones.odt". Change
+my mind, not going to do this.
 
 [x] In init command allow to pass a path.
 
@@ -41,7 +42,7 @@ Font size: 110
 
 [ ] Validate that all arguments of edit are valid, files exist, color are the correct format.
 
-[ ] Ensure copy can accept paths. If no path is passed it is implicit ".".
+[x] Ensure copy can accept paths. If no path is passed it is implicit ".".
 
 [ ] Improve error message for init, and provably other commands, "eventos init"
 indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.

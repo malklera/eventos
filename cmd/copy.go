@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"time"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -13,8 +13,8 @@ import (
 var copyCmd = &cobra.Command{
 	Use:   "copy",
 	Short: "Copy files from phone to pc.",
-	Long:  `eventos copy srcPath dstPath
-	eventos copy ".../Almacenamiento interno/DCIM/Camera/<eventName>" <eventName>`,
+	Long: `eventos copy srcPath dstPath
+	eventos copy ".../Almacenamiento interno/DCIM/Camera/<eventName>" "path/to/<eventName>"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 2 {
 			return fmt.Errorf("wrong number of arguments, got: %d, want: 2", len(args))
@@ -27,8 +27,7 @@ var copyCmd = &cobra.Command{
 
 		fmt.Println("Total src videos:", len(files))
 		count := 0
-		evento := filepath.Join("/home/malklera/Videos/eventos", args[1])
-		original := filepath.Join(evento, "original")
+		original := filepath.Join(args[1], "original")
 		start := time.Now()
 		for _, file := range files {
 			src := filepath.Join(args[0], file.Name())
