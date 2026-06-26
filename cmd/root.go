@@ -16,21 +16,24 @@ var rootCmd = &cobra.Command{
 
 	eventos init eventName
 
-Create Gmail Drive folder for the event, ensure it is private, copy <url>	
+Create Gmail Drive folder for the event, ensure it is private, copy the url
 
 	cd eventName
 	eventos qr <url>
 
 Copy videos from phone to eventName/original
 
-	eventos copy <"path to phone videos directory"> <eventName>
+	eventos copy <"path to phone videos directory"> ["path to eventName"]
 
 	eventos rename
 
 	eventos format
 
-Cut each video manually and export them to ~/Videos/eventos/eventName/cortado
+Cut each video manually and export them to eventName/cortado
 In the process take a screenshot of each for the catalog.
+Important consideration, catalog works because the tool used for taking the
+screenshots "LosslessCut" save the files in the directory the videos are exported
+at, in this case eventName/cortado
 
 	eventos catalog
 

@@ -28,3 +28,20 @@ Image with contact info
 Resolution: 1080x1920
 Font: Works Sans regular
 Font size: 110
+
+---
+
+# TODO
+
+[ ] Add command or flag to point to the assets like "1 - Indicaciones.odt"
+
+[x] In init command allow to pass a path.
+
+[ ] Change the durations to return float64 instead of int.
+
+[ ] Validate that all arguments of edit are valid, files exist, color are the correct format.
+
+[ ] Ensure copy can accept paths. If no path is passed it is implicit ".".
+
+[ ] Improve error message for init, and provably other commands, "eventos init"
+indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
