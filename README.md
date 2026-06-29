@@ -53,7 +53,7 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 
 [ ] Implement -run and -save flags.
 
-[ ] Use flag.Changed instead of checking for ""
+[x] Use flag.Changed instead of checking for ""
 
 [x] Check the PreRunE in edit.go, i think it can be better, see about writing
 test for it.

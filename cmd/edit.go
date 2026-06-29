@@ -53,7 +53,7 @@ var editCmd = &cobra.Command{
 		return preRun(cmd)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := validArgs(); err != nil {
+		if err := validArgs(cmd); err != nil {
 			return err
 		}
 		videoW := 1080
@@ -77,11 +77,11 @@ var editCmd = &cobra.Command{
 		cuttedDir := "cortado"
 
 		// If eventText is not empty, wrap it as needed
-		if eventText != "" {
+		if cmd.Flags().Changed("text") {
 			eventText = wrapText(eventText, fontSize, videoW, eventTextMargin)
 		}
 		// If clientText is not empty, wrap it as needed
-		if clientText != "" {
+		if cmd.Flags().Changed("client") {
 			clientText = wrapText(clientText, fontSize, videoW, eventTextMargin)
 		} else {
 			// If it is empty, add the up and down text
@@ -99,7 +99,7 @@ var editCmd = &cobra.Command{
 		start := time.Now()
 		dst := "editado"
 		musicT := 0.0
-		if music != "" {
+		if cmd.Flags().Changed("music") {
 			var err error
 			musicT, err = fileDuration(music)
 			if err != nil {
@@ -123,7 +123,7 @@ var editCmd = &cobra.Command{
 			ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
 			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", logo)
 
-			if music != "" {
+			if cmd.Flags().Changed("music") {
 				if musicT < (videoT + 2*imageT) {
 					fmt.Fprintf(os.Stderr, "Error: music too short, musicT: %f, totalT: %f\n", musicT, (videoT + 2*imageT))
 					continue
@@ -131,17 +131,17 @@ var editCmd = &cobra.Command{
 				ffmpegEdit = append(ffmpegEdit, "-i", music)
 			}
 
-			if iconLeft != "" {
+			if cmd.Flags().Changed("left") {
 				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", iconLeft)
 			}
-			if iconRight != "" {
+			if cmd.Flags().Changed("right") {
 				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", iconRight)
 			}
 
 			totalT := 0.0
 
 			// client image + crossfade + main video + fade out + logo
-			if image != "" {
+			if cmd.Flags().Changed("image") {
 				preLogoVisualT := imageT + videoT
 				totalT = preLogoVisualT + imageT
 				clientFadeOutStart := imageT - transitionT
@@ -257,7 +257,7 @@ var editCmd = &cobra.Command{
 				curV := "video_combined"
 
 				// 1. Event text
-				if eventText != "" {
+				if cmd.Flags().Changed("text") {
 					filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:line_spacing=%d:text_align=center:alpha='if(lt(t,%f),0,if(lt(t,%f),(t-%f)/%f,if(gt(t,%f),(1-(t-%f)/%f),1)))'[v_ev];", curV, eventText, eventTextX, eventTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, lineSpacing, textFadeInStart, textFadeInEnd, textFadeInStart, transitionT, textFadeOutStart, textFadeOutStart, transitionT)
 					curV = "v_ev"
 				}
@@ -265,13 +265,13 @@ var editCmd = &cobra.Command{
 				// 2. CLIENT_TEXT (during introduction image)
 				// TODO: this conditional is wrong, clientText and clientTextUp/Down
 				// are mutually exlclusive or should be
-				if clientText != "" {
-					if clientTextUp != "" || clientTextDown != "" {
-						if clientTextUp != "" {
+				if cmd.Flags().Changed("client") {
+					if cmd.Flags().Changed("up") || cmd.Flags().Changed("down") {
+						if cmd.Flags().Changed("up") {
 							filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s-60:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:alpha='if(lt(t,%f),1,if(lt(t,%f),(1-(t-%f)/%f),0))'[v_up];", curV, clientTextUp, clientTextX, clientTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, clientFadeOutStart, imageT, clientFadeOutStart, transitionT)
 							curV = "v_up"
 						}
-						if clientTextDown != "" {
+						if cmd.Flags().Changed("down") {
 							filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s+60:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:alpha='if(lt(t,%f),1,if(lt(t,%f),(1-(t-%f)/%f),0))'[v_dw];", curV, clientTextUp, clientTextX, clientTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, clientFadeOutStart, imageT, clientFadeOutStart, transitionT)
 							curV = "v_dw"
 						}
@@ -286,7 +286,7 @@ var editCmd = &cobra.Command{
 				// Identify the audio source and handle optional music/video audio
 				currentStream := "v_with_text"
 				nextInput := 0
-				if music != "" {
+				if cmd.Flags().Changed("music") {
 					// Music covers the full duration
 					filterComplex += fmt.Sprintf("[3:a]afade=t=in:st=0:d=%f,atrim=0:%f,asetpts=PTS-STARTPTS,afade=t=out:st=%f:d=%f[a_out];", transitionT, totalT, (totalT - transitionT), transitionT)
 					// Icons start after [3:a]
@@ -299,7 +299,7 @@ var editCmd = &cobra.Command{
 				}
 
 				iconSpacing := 20
-				if iconLeft != "" {
+				if cmd.Flags().Changed("left") {
 					// Calculate icon X position: center minus half text width minus icon width minus spacing
 					// Use max(0, ...) to ensure icon stays on screen even if text is wide
 					iconLeftX := fmt.Sprintf("max(0,W/2-%d/2-w-%d)", textW, iconSpacing)
@@ -313,7 +313,7 @@ var editCmd = &cobra.Command{
 					nextInput++
 				}
 
-				if iconRight != "" {
+				if cmd.Flags().Changed("right") {
 					// Calculate icon X position: center plus half text width plus spacing
 					// Use min(W-w, ...) to ensure icon stays on screen
 					iconRightX := fmt.Sprintf("min(W-w,W/2+%d/2+%d)", textW, iconSpacing)
@@ -347,14 +347,14 @@ var editCmd = &cobra.Command{
 
 				// --- Dynamic Text Overlay Logic (Case 2) ---
 				curV := "video_combined"
-				if eventText != "" {
+				if cmd.Flags().Changed("text") {
 					filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:line_spacing=%d:text_align=center:alpha='if(gt(t,%f),(1-(t-%f)/%f),1)'[v_out];", curV, eventText, eventTextX, eventTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, lineSpacing, videoEndFadeStart, videoEndFadeStart, transitionT)
 				} else {
 					filterComplex += fmt.Sprintf("[%s]null[v_out];", curV)
 				}
 
 				// Audio: Handle optional music and silent videos
-				if music != "" {
+				if cmd.Flags().Changed("music") {
 					// Music covers the full duration
 					filterComplex += fmt.Sprintf("[2:a]afade=t=in:st=0:d=%f,atrim=0:%f,asetpts=PTS-STARTPTS,afade=t=out:st=%f:d=%f[a_out];", transitionT, totalT, (totalT - transitionT), transitionT)
 				} else {
@@ -455,7 +455,6 @@ func wrapText(text string, fontSize int, videoW int, margin int) string {
 
 // fileDuration take a path and run ffprobe to learn its duration, return the quotient and any error
 func fileDuration(path string) (float64, error) {
-	// TODO: change to return a float
 	ffprobe := exec.Command("ffprobe",
 		"-loglevel",
 		"error",
@@ -477,49 +476,49 @@ func fileDuration(path string) (float64, error) {
 }
 
 // validArgs ensure all passed arguments exists
-func validArgs() error {
+func validArgs(cmd *cobra.Command) error {
 	_, err := os.Stat(logo)
 	if err != nil {
 		return err
 	}
-	if image != "" {
+	if cmd.Flags().Changed("image") {
 		_, err = os.Stat(image)
 		if err != nil {
 			return err
 		}
 	}
-	if music != "" {
+	if cmd.Flags().Changed("music") {
 		_, err = os.Stat(music)
 		if err != nil {
 			return err
 		}
 	}
-	if font != "" {
+	if cmd.Flags().Changed("font") {
 		_, err = os.Stat(font)
 		if err != nil {
 			return err
 		}
 	}
-	if iconLeft != "" {
+	if cmd.Flags().Changed("left") {
 		_, err = os.Stat(iconLeft)
 		if err != nil {
 			return err
 		}
 	}
-	if iconRight != "" {
+	if cmd.Flags().Changed("right") {
 		_, err = os.Stat(iconRight)
 		if err != nil {
 			return err
 		}
 	}
 
-	if clientColor != "" {
+	if cmd.Flags().Changed("client-color") {
 		if !colorRe.MatchString(clientColor) {
 			return fmt.Errorf("'%s' is an invalid color, use e.g. '0xRRGGBB'", clientColor)
 		}
 	}
 
-	if textColor != "" {
+	if cmd.Flags().Changed("text-color") {
 		if !colorRe.MatchString(textColor) {
 			return fmt.Errorf("'%s' is an invalid color, use e.g. '0xRRGGBB'", textColor)
 		}
