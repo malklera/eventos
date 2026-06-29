@@ -40,15 +40,20 @@ my mind, not going to do this.
 
 [x] Change the durations to return float64 instead of int.
 
-[ ] Validate that all arguments of edit are valid, files exist, color are the correct format.
+[x] Validate that all arguments of edit are valid, files exist, color are the correct format.
 
 [x] Ensure copy can accept paths. If no path is passed it is implicit ".".
 
 [ ] Improve error message for init, and provably other commands, "eventos init"
 indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
 
-[ ] Passing clientColor flag is only valid with clientText
+[x] Passing clientColor flag is only valid with clientText
 
-[ ] Passing textColor flag is only valid with eventText
+[x] Passing textColor flag is only valid with eventText
 
 [ ] Implement -run and -save flags.
+
+[ ] Use flag.Changed instead of checking for ""
+
+[x] Check the PreRunE in edit.go, i think it can be better, see about writing
+test for it.
