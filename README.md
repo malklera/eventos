@@ -6,8 +6,7 @@ This CLI is used to manage and edit videos used in the 360 Platform service by
 To install.
 
 ```sh
-TAG=$(git describe --tags --exact-match 2>/dev/null || echo dev)
-go install -ldflags "-X 'main.tag=$TAG'"
+go install -ldflags "-X 'github.com/malklera/eventos/cmd.tag=$(git describe --tags --exact-match 2>/dev/null || echo dev)'"
 ```
 
 To use read the steps given by `eventos help`.
@@ -62,3 +61,5 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 
 [x] Check the PreRunE in edit.go, i think it can be better, see about writing
 test for it.
+
+[ ] Search for TODO in the project.
