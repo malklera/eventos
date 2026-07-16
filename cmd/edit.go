@@ -468,9 +468,10 @@ func fileDuration(path string) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("ffprobe.Run(%s): %w", ffprobe.String(), err)
 	}
-	dur, err := strconv.ParseFloat(string(out), 64)
+	o, _ := strings.CutSuffix(string(out), "\n")
+	dur, err := strconv.ParseFloat(o, 64)
 	if err != nil {
-		return 0, fmt.Errorf("strconv.Atoi(string(%v)): %w", out, err)
+		return 0, fmt.Errorf("strconv.ParseFloat(string(%v), 64): %w", out, err)
 	}
 	return dur, nil
 }
