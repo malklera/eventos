@@ -63,3 +63,5 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 test for it.
 
 [ ] Search for TODO in the project.
+
+[ ] Change generated qr to 302,362*302,362 px or 80 mm

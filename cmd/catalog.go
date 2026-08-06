@@ -14,11 +14,11 @@ var catalogCmd = &cobra.Command{
 	Use:   "catalog",
 	Short: "Copy the screenshots from <nameEvent>/cortado to <nameEvent>/catalogo",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("catalog called")
 		files, err := os.ReadDir("cortado")
 		if err != nil {
 			return fmt.Errorf("os.ReadDir(\"cortado\"): %w", err)
 		}
+		fmt.Println("Originals:", len(files))
 		for _, file := range files {
 			if strings.HasSuffix(file.Name(), ".png") {
 				number, _, _ := strings.Cut(file.Name(), "-")
@@ -30,6 +30,11 @@ var catalogCmd = &cobra.Command{
 				}
 			}
 		}
+		fp, err := os.ReadDir("catalogo")
+		if err != nil {
+			return fmt.Errorf("os.ReadDir(\"catalogo\"): %w", err)
+		}
+		fmt.Println("Copied:", len(fp))
 		return nil
 	},
 }

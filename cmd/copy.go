@@ -22,7 +22,7 @@ var copyCmd = &cobra.Command{
 
 		files, err := listVideos(args[0])
 		if err != nil {
-			return fmt.Errorf("error reading '%s': %w", args[0], err)
+			return fmt.Errorf("reading '%s': %w", args[0], err)
 		}
 
 		fmt.Println("Total src videos:", len(files))

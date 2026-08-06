@@ -23,7 +23,7 @@ Create Gmail Drive folder for the event, ensure it is private, copy the url
 
 Copy videos from phone to eventName/original
 
-	eventos copy <"path to phone videos directory"> ["path to eventName"]
+	eventos copy <"path to phone videos directory"> <"path to eventName">
 
 	eventos rename
 
