@@ -16,7 +16,7 @@ var rootCmd = &cobra.Command{
 
 	eventos init eventName
 
-Create Gmail Drive folder for the event, ensure it is private, copy the url
+Create Gmail Drive folder for the event, ensure it is public, copy the url
 
 	cd eventName
 	eventos qr <url>

@@ -48,20 +48,24 @@ my mind, not going to do this.
 
 [x] Ensure copy can accept paths. Both path are mandatory.
 
-[ ] Improve error message for init, and provably other commands, "eventos init"
-indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
-
 [x] Passing clientColor flag is only valid with clientText
 
 [x] Passing textColor flag is only valid with eventText
-
-[ ] Implement -run and -save flags.
 
 [x] Use flag.Changed instead of checking for ""
 
 [x] Check the PreRunE in edit.go, i think it can be better, see about writing
 test for it.
 
-[ ] Search for TODO in the project.
+[ ] Implement -run and -save flags.
+
+[ ] Improve error message for init, and provably other commands, "eventos init"
+indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
 
 [ ] Change generated qr to 302,362*302,362 px or 80 mm
+
+[ ] Get ride of the client text related flags and code.
+
+[ ] Handle incorrect image size.
+
+[ ] Change -logo to be optional.
