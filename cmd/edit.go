@@ -27,13 +27,8 @@ var (
 )
 
 var (
-	ErrClientWithoutImage       = errors.New("'client' flag is only allowed when 'image' is passed")
-	ErrUpWithoutImage           = errors.New("'up' flag is only allowed when 'image' is passed")
-	ErrLeftWithoutClient        = errors.New("'left' flag is only allowed when 'client' is passed")
-	ErrRightWithoutClient       = errors.New("'right' flag is only allowed when 'client' is passed")
-	ErrClientColorWithoutClient = errors.New("'client-color' flag is only allowed when 'client' is passed")
-	ErrTextColorWithoutText     = errors.New("'text-color' flag is only allowed when 'text' is passed")
-	ErrFontWithoutTextOrClient  = errors.New("'font' flag is only allowed when 'text' or 'client' is passed")
+	ErrTextColorWithoutText = errors.New("'text-color' flag is only allowed when 'text' is passed")
+	ErrFontWithoutText      = errors.New("'font' flag is only allowed when 'text' is passed")
 )
 
 var colorRe = regexp.MustCompile(`^0x[0-9A-Fa-f]{6}$`)
@@ -102,7 +97,9 @@ var editCmd = &cobra.Command{
 			dstF := filepath.Join(dst, file.Name())
 			fmt.Println("Formateando:", videoPath)
 			ffmpegEdit := []string{"ffmpeg", "-v", "error"}
-			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", image)
+			if cmd.Flags().Changed("image") {
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", image)
+			}
 			ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
 			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", logo)
 
@@ -243,17 +240,12 @@ var editCmd = &cobra.Command{
 
 				// Identify the audio source and handle optional music/video audio
 				currentStream := "v_with_text"
-				nextInput := 0
 				if cmd.Flags().Changed("music") {
 					// Music covers the full duration
 					filterComplex += fmt.Sprintf("[3:a]afade=t=in:st=0:d=%f,atrim=0:%f,asetpts=PTS-STARTPTS,afade=t=out:st=%f:d=%f[a_out];", transitionT, totalT, (totalT - transitionT), transitionT)
-					// Icons start after [3:a]
-					nextInput = 4
 				} else {
 					// No music, generate silence to prevent ffmpeg crash
 					filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%f,asetpts=PTS-STARTPTS[a_out];", totalT)
-					// Icons start after [2:v] (logo)
-					nextInput = 3
 				}
 
 				filterComplex += fmt.Sprintf("[%s]null[v_out]", currentStream)
@@ -343,26 +335,11 @@ func init() {
 }
 
 func preRun(cmd *cobra.Command) error {
-	if !cmd.Flags().Changed("image") && cmd.Flags().Changed("client") {
-		return ErrClientWithoutImage
-	}
-	if !cmd.Flags().Changed("image") && cmd.Flags().Changed("up") {
-		return ErrUpWithoutImage
-	}
-	if !cmd.Flags().Changed("client") && cmd.Flags().Changed("left") {
-		return ErrLeftWithoutClient
-	}
-	if !cmd.Flags().Changed("client") && cmd.Flags().Changed("right") {
-		return ErrRightWithoutClient
-	}
-	if !cmd.Flags().Changed("client") && cmd.Flags().Changed("client-color") {
-		return ErrClientColorWithoutClient
-	}
 	if !cmd.Flags().Changed("text") && cmd.Flags().Changed("text-color") {
 		return ErrTextColorWithoutText
 	}
-	if (!cmd.Flags().Changed("text") && !cmd.Flags().Changed("client")) && cmd.Flags().Changed("font") {
-		return ErrFontWithoutTextOrClient
+	if !cmd.Flags().Changed("text") && cmd.Flags().Changed("font") {
+		return ErrFontWithoutText
 	}
 	return nil
 }
@@ -426,17 +403,4 @@ func validArgs(cmd *cobra.Command) error {
 	}
 
 	return nil
-}
-
-// maxLenght takes a possibly newline separated string and measure the longest
-// line in it
-func maxLenght(t string, fontSize int) int {
-	parts := strings.Split(t, "\n")
-	lenght := 0
-	for _, p := range parts {
-		if lenght < len(p) {
-			lenght = len(p)
-		}
-	}
-	return lenght * fontSize * 7 / 10
 }

@@ -13,25 +13,14 @@ func TestPreRun(t *testing.T) {
 		flags   map[string]string
 		wantErr error
 	}{
-		{name: "client", flags: map[string]string{"client": "foo"}, wantErr: ErrClientWithoutImage},
-		{name: "up", flags: map[string]string{"up": "foo"}, wantErr: ErrUpWithoutImage},
-		{name: "left", flags: map[string]string{"left": "foo"}, wantErr: ErrLeftWithoutClient},
-		{name: "right", flags: map[string]string{"right": "foo"}, wantErr: ErrRightWithoutClient},
-		{name: "client-color", flags: map[string]string{"client-color": "foo"}, wantErr: ErrClientColorWithoutClient},
 		{name: "text-color", flags: map[string]string{"text-color": "foo"}, wantErr: ErrTextColorWithoutText},
-		{name: "font", flags: map[string]string{"font": "foo"}, wantErr: ErrFontWithoutTextOrClient},
+		{name: "font", flags: map[string]string{"font": "foo"}, wantErr: ErrFontWithoutText},
 		// {name: "", flags: map[string]string{"": "foo"}, wantErr: Err},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := &cobra.Command{}
-			cmd.Flags().String("image", "", "")
-			cmd.Flags().String("client", "", "")
-			cmd.Flags().String("up", "", "")
-			cmd.Flags().String("left", "", "")
-			cmd.Flags().String("right", "", "")
-			cmd.Flags().String("client-color", "", "")
 			cmd.Flags().String("text", "", "")
 			cmd.Flags().String("text-color", "", "")
 			cmd.Flags().String("font", "", "")
