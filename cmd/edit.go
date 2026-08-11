@@ -16,20 +16,14 @@ import (
 )
 
 var (
-	logo           string
-	music          string
-	image          string
-	eventText      string
-	clientText     string
-	clientTextUp   string
-	clientTextDown string
-	clientColor    string
-	textColor      string
-	font           string
-	iconLeft       string
-	iconRight      string
-	save           bool
-	run            bool
+	logo      string
+	music     string
+	image     string
+	eventText string
+	textColor string
+	font      string
+	save      bool
+	run       bool
 )
 
 var (
@@ -68,8 +62,6 @@ var editCmd = &cobra.Command{
 		borderW := 2
 		borderColor := "0x000000"
 		boxPadding := 8
-		clientTextX := "(w-tw)/2"
-		clientTextY := "(h-th)/1.25"
 		eventTextX := "(w-tw)/2"
 		eventTextY := "H-th-100"
 		eventTextMargin := 100
@@ -80,15 +72,6 @@ var editCmd = &cobra.Command{
 		if cmd.Flags().Changed("text") {
 			eventText = wrapText(eventText, fontSize, videoW, eventTextMargin)
 		}
-		// If clientText is not empty, wrap it as needed
-		if cmd.Flags().Changed("client") {
-			clientText = wrapText(clientText, fontSize, videoW, eventTextMargin)
-		} else {
-			// If it is empty, add the up and down text
-			clientText = clientTextUp + "\n" + clientTextDown
-		}
-
-		textW := maxLenght(clientText, fontSize)
 
 		cuttedVideos, err := listVideos(cuttedDir)
 		if err != nil {
@@ -129,13 +112,6 @@ var editCmd = &cobra.Command{
 					continue
 				}
 				ffmpegEdit = append(ffmpegEdit, "-i", music)
-			}
-
-			if cmd.Flags().Changed("left") {
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", iconLeft)
-			}
-			if cmd.Flags().Changed("right") {
-				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", iconRight)
 			}
 
 			totalT := 0.0
@@ -262,25 +238,7 @@ var editCmd = &cobra.Command{
 					curV = "v_ev"
 				}
 
-				// 2. CLIENT_TEXT (during introduction image)
-				// TODO: this conditional is wrong, clientText and clientTextUp/Down
-				// are mutually exlclusive or should be
-				if cmd.Flags().Changed("client") {
-					if cmd.Flags().Changed("up") || cmd.Flags().Changed("down") {
-						if cmd.Flags().Changed("up") {
-							filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s-60:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:alpha='if(lt(t,%f),1,if(lt(t,%f),(1-(t-%f)/%f),0))'[v_up];", curV, clientTextUp, clientTextX, clientTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, clientFadeOutStart, imageT, clientFadeOutStart, transitionT)
-							curV = "v_up"
-						}
-						if cmd.Flags().Changed("down") {
-							filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s+60:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:alpha='if(lt(t,%f),1,if(lt(t,%f),(1-(t-%f)/%f),0))'[v_dw];", curV, clientTextUp, clientTextX, clientTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, clientFadeOutStart, imageT, clientFadeOutStart, transitionT)
-							curV = "v_dw"
-						}
-					} else {
-						// Fallback to single text (auto-wrapped if needed)
-						filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:text_align=center:alpha='if(lt(t,%f),1,if(lt(t,%f),(1-(t-%f)/%f),0))'[v_cl];", curV, clientText, clientTextX, clientTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, clientFadeOutStart, imageT, clientFadeOutStart, transitionT)
-						curV = "v_cl"
-					}
-				}
+
 				filterComplex += fmt.Sprintf("[%s]null[v_with_text];", curV)
 
 				// Identify the audio source and handle optional music/video audio
@@ -296,34 +254,6 @@ var editCmd = &cobra.Command{
 					filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%f,asetpts=PTS-STARTPTS[a_out];", totalT)
 					// Icons start after [2:v] (logo)
 					nextInput = 3
-				}
-
-				iconSpacing := 20
-				if cmd.Flags().Changed("left") {
-					// Calculate icon X position: center minus half text width minus icon width minus spacing
-					// Use max(0, ...) to ensure icon stays on screen even if text is wide
-					iconLeftX := fmt.Sprintf("max(0,W/2-%d/2-w-%d)", textW, iconSpacing)
-
-					// Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
-					filterComplex += fmt.Sprintf("[%d:v]scale=-1:%d:force_original_aspect_ratio=decrease,fade=t=out:st=%f:d=%f:alpha=1[icon_left_scaled];", nextInput, fontSize, clientFadeOutStart, transitionT)
-					// Position left icon to the left of the text
-					// Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
-					filterComplex += fmt.Sprintf("[%s][icon_left_scaled]overlay=x='%s':y='(H-h)/1.25':enable='between(t,0,%f)':format=auto[v_with_left];", currentStream, iconLeftX, imageT)
-					currentStream = "v_with_left"
-					nextInput++
-				}
-
-				if cmd.Flags().Changed("right") {
-					// Calculate icon X position: center plus half text width plus spacing
-					// Use min(W-w, ...) to ensure icon stays on screen
-					iconRightX := fmt.Sprintf("min(W-w,W/2+%d/2+%d)", textW, iconSpacing)
-
-					// Scale icon maintaining aspect ratio, then apply ONLY fade out to match text timing
-					filterComplex += fmt.Sprintf("[%d:v]scale=-1:%d:force_original_aspect_ratio=decrease,fade=t=out:st=%f:d=%f:alpha=1[icon_right_scaled];", nextInput, fontSize, clientFadeOutStart, transitionT)
-					// Position right icon to the right of the text
-					// Y: Match CLIENT_TEXT_Y formula: (H-h)/1.25 positions at ~75% down
-					filterComplex += fmt.Sprintf("[%s][icon_right_scaled]overlay=x='%s':y='(H-h)/1.25':enable='between(t,0,%f)':format=auto[v_with_right];", currentStream, iconRightX, imageT)
-					currentStream = "v_with_right"
 				}
 
 				filterComplex += fmt.Sprintf("[%s]null[v_out]", currentStream)
@@ -400,25 +330,14 @@ func init() {
 	editCmd.Flags().StringVarP(&logo, "logo", "l", "", "Path to logo image file (~/Videos/eventos/assets/logo/myLogo.png).")
 	editCmd.Flags().StringVarP(&music, "music", "m", "", "Path to music file (~/Videos/eventos/assets/musica/cortado/myMusic.mp3).")
 	editCmd.Flags().StringVarP(&image, "image", "i", "", "Client image file name, file has to be inside <event-name>/.")
+
 	editCmd.Flags().StringVarP(&eventText, "text", "t", "", "Text to overlay on the whole video.")
-
-	editCmd.Flags().StringVarP(&clientText, "client", "c", "", "Client text to display over client image.")
-	editCmd.Flags().StringVarP(&clientTextUp, "up", "u", "", "Upper line of client text (manual split, bypasses auto-wrap).")
-	editCmd.MarkFlagsMutuallyExclusive("client", "up")
-
-	editCmd.Flags().StringVarP(&clientTextDown, "down", "d", "", "Lower line of client text (manual split, bypasses auto-wrap).")
-	editCmd.Flags().StringVarP(&clientColor, "client-color", "C", "0xE6E70F", "Client text color in hex format (e.g., \"0xFFFFFF\" or \"0xE6E70F\").")
 	editCmd.Flags().StringVarP(&textColor, "text-color", "T", "0xE6E70F", "Event text color in hex format (e.g., \"0xFFFFFF\" or \"0xE6E70F\").")
 	editCmd.Flags().StringVarP(&font, "font", "f", "/usr/local/share/fonts/Courgette-Regular.ttf", "Path to font to use for all text (e.g., /usr/share/fonts/TTF/MyFont.ttf).")
-	editCmd.Flags().StringVarP(&iconLeft, "left", "L", "", "Path to icon image to display to the left of client text.")
-	editCmd.Flags().StringVarP(&iconRight, "right", "R", "", "Path to icon image to display to the right of client text.")
 
 	editCmd.Flags().BoolVarP(&save, "save", "s", false, "Save the current command.")
 	editCmd.Flags().BoolVarP(&run, "run", "r", false, "Run the saved command.")
 	editCmd.MarkFlagsMutuallyExclusive("save", "run")
-	// You either `run` the saved command or executed/`save` the current one, making `logo`
-	// required.
-	editCmd.MarkFlagsOneRequired("run", "logo")
 
 	rootCmd.AddCommand(editCmd)
 }
@@ -500,25 +419,6 @@ func validArgs(cmd *cobra.Command) error {
 			return err
 		}
 	}
-	if cmd.Flags().Changed("left") {
-		_, err = os.Stat(iconLeft)
-		if err != nil {
-			return err
-		}
-	}
-	if cmd.Flags().Changed("right") {
-		_, err = os.Stat(iconRight)
-		if err != nil {
-			return err
-		}
-	}
-
-	if cmd.Flags().Changed("client-color") {
-		if !colorRe.MatchString(clientColor) {
-			return fmt.Errorf("'%s' is an invalid color, use e.g. '0xRRGGBB'", clientColor)
-		}
-	}
-
 	if cmd.Flags().Changed("text-color") {
 		if !colorRe.MatchString(textColor) {
 			return fmt.Errorf("'%s' is an invalid color, use e.g. '0xRRGGBB'", textColor)
