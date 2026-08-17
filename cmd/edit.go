@@ -144,13 +144,13 @@ var editCmd = &cobra.Command{
 
 				// Scale and prepare all video inputs
 				// Client image fade out to black at the end
-				filterComplex := fmt.Sprintf("[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,fade=t=out:st=%f:d=%f[client];", videoW, videoH, videoW, videoH, clientFadeOutStart, transitionT)
+				filterComplex := fmt.Sprintf("[0:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS,fade=t=out:st=%f:d=%f[client];", videoW, videoH, clientFadeOutStart, transitionT)
 				filterComplex += fmt.Sprintf("[1:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video];", videoW, videoH)
 				// TODO: is this needed? logo is an image i control, with the correct dimensions
 				// use this??
 				// filterComplex += fmt.Sprintf("[2:v]fps=30,setpts=PTS-STARTPTS,fade=t=in:st=0:d=%d[logo];", transitionT)
 				// logo: scale + fade-in from black
-				filterComplex += fmt.Sprintf("[2:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%f[logo];", videoW, videoH, videoW, videoH, transitionT)
+				filterComplex += fmt.Sprintf("[2:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%f[logo];", videoW, videoH, transitionT)
 				// Slide-up entrance + slide-out exit for main video (both over TRANSITION_DURATION)
 				// Slide-up: y goes H -> 0 in first TD seconds
 				// Slide-out: y goes 0 -> -H in last TD seconds (slides up off-screen)
@@ -235,7 +235,6 @@ var editCmd = &cobra.Command{
 					curV = "v_ev"
 				}
 
-
 				filterComplex += fmt.Sprintf("[%s]null[v_with_text];", curV)
 
 				// Identify the audio source and handle optional music/video audio
@@ -262,7 +261,7 @@ var editCmd = &cobra.Command{
 
 				// Scale and prepare video inputs
 				filterComplex := fmt.Sprintf("[0:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video_raw];", videoW, videoH)
-				filterComplex += "[1:v]fps=30,setpts=PTS-STARTPTS[logo];"
+				filterComplex += fmt.Sprintf("[1:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS[logo];", videoW, videoH)
 
 				// Transition from input_video to logo
 				filterComplex += fmt.Sprintf("[video_raw][logo]xfade=transition=fade:duration=%f:offset=%f[video_combined];", transitionT, logoTransitionStart)
@@ -372,30 +371,39 @@ func fileDuration(path string) (float64, error) {
 	return dur, nil
 }
 
-// validArgs ensure all passed arguments exists
+// validArgs ensure all passed arguments are valid, mostly if they exist
 func validArgs(cmd *cobra.Command) error {
-	_, err := os.Stat(logo)
-	if err != nil {
-		return err
+	if cmd.Flags().Changed("logo") {
+		_, err := os.Stat(logo)
+		if err != nil {
+			return err
+		}
+		if err != nil {
+			return err
+		}
 	}
+
 	if cmd.Flags().Changed("image") {
-		_, err = os.Stat(image)
+		_, err := os.Stat(image)
 		if err != nil {
 			return err
 		}
 	}
+
 	if cmd.Flags().Changed("music") {
-		_, err = os.Stat(music)
+		_, err := os.Stat(music)
 		if err != nil {
 			return err
 		}
 	}
+
 	if cmd.Flags().Changed("font") {
-		_, err = os.Stat(font)
+		_, err := os.Stat(font)
 		if err != nil {
 			return err
 		}
 	}
+
 	if cmd.Flags().Changed("text-color") {
 		if !colorRe.MatchString(textColor) {
 			return fmt.Errorf("'%s' is an invalid color, use e.g. '0xRRGGBB'", textColor)
