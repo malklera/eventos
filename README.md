@@ -57,6 +57,8 @@ my mind, not going to do this.
 [x] Check the PreRunE in edit.go, i think it can be better, see about writing
 test for it.
 
+[x] Get ride of the client text related flags and code.
+
 [ ] Implement -run and -save flags.
 
 [ ] Improve error message for init, and provably other commands, "eventos init"
@@ -64,8 +66,12 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 
 [ ] Change generated qr to 302,362*302,362 px or 80 mm
 
-[ ] Get ride of the client text related flags and code.
-
 [ ] Handle incorrect image size.
 
 [ ] Change -logo to be optional.
+
+[ ] Add a notification when copy, format or edit finish
+
+[ ] Improve error for copy, add "eventos copy <source> <destination>"
+
+[ ] Update the message when calling catalog subcommand
