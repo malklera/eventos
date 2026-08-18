@@ -96,195 +96,204 @@ var editCmd = &cobra.Command{
 			// CMD part
 			dstF := filepath.Join(dst, file.Name())
 			fmt.Println("Formateando:", videoPath)
+
+			hasImage := cmd.Flags().Changed("image")
+			hasLogo := cmd.Flags().Changed("logo")
+			hasMusic := cmd.Flags().Changed("music")
+			hasText := cmd.Flags().Changed("text")
+
+			// Compute totalT based on which inputs are present
+			var totalT float64
+			switch {
+			case hasImage && hasLogo:
+				totalT = imageT + videoT + imageT
+			case hasImage && !hasLogo:
+				totalT = imageT + videoT
+			case !hasImage && hasLogo:
+				totalT = videoT + imageT - transitionT
+			default:
+				totalT = videoT
+			}
+
+			// Check music length
+			if hasMusic && musicT < totalT {
+				fmt.Fprintf(os.Stderr, "Error: music too short, musicT: %f, totalT: %f\n", musicT, totalT)
+				continue
+			}
+
+			// Build ffmpeg inputs and track stream indices
 			ffmpegEdit := []string{"ffmpeg", "-v", "error"}
-			if cmd.Flags().Changed("image") {
+			nextIdx := 0
+			imgIdx := -1
+			videoIdx := -1
+			logoIdx := -1
+			musicIdx := -1
+
+			if hasImage {
 				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", image)
+				imgIdx = nextIdx
+				nextIdx++
 			}
 			ffmpegEdit = append(ffmpegEdit, "-i", videoPath)
-			ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", logo)
-
-			if cmd.Flags().Changed("music") {
-				if musicT < (videoT + 2*imageT) {
-					fmt.Fprintf(os.Stderr, "Error: music too short, musicT: %f, totalT: %f\n", musicT, (videoT + 2*imageT))
-					continue
-				}
+			videoIdx = nextIdx
+			nextIdx++
+			if hasLogo {
+				ffmpegEdit = append(ffmpegEdit, "-loop", "1", "-t", strconv.FormatFloat(imageT, 'f', -1, 64), "-i", logo)
+				logoIdx = nextIdx
+				nextIdx++
+			}
+			if hasMusic {
 				ffmpegEdit = append(ffmpegEdit, "-i", music)
+				musicIdx = nextIdx
+				nextIdx++
 			}
 
-			totalT := 0.0
+			// Build filter_complex: always apply effects pipeline, optionally prepend/append image/logo
+			filterComplex := ""
 
-			// client image + crossfade + main video + fade out + logo
-			if cmd.Flags().Changed("image") {
-				preLogoVisualT := imageT + videoT
-				totalT = preLogoVisualT + imageT
+			// --- Always build effects pipeline for the video ---
+			videoFadeOutStart := videoT - transitionT
+			pLen := (videoT + 2*transitionT) / 5
+			part1End := pLen
+			part2Start := part1End - transitionT
+			part2End := part2Start + pLen
+			part3Start := part2End
+			part3End := part3Start + pLen
+			part4Start := part3End
+			part4End := part4Start + pLen
+			part5Start := part4End - transitionT
+
+			fmt.Printf("Image: %v, Logo: %v, Video: %f, Total: %f\n", hasImage, hasLogo, videoT, totalT)
+
+			// Scale video
+			filterComplex = fmt.Sprintf("[%d:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video];", videoIdx, videoW, videoH)
+			// Video background for slide effects
+			filterComplex += fmt.Sprintf("color=c=black:s=%dx%d:d=%f:r=30[video_bg];", videoW, videoH, videoT)
+			// Video slide overlay (slide-up entrance + slide-out exit)
+			filterComplex += fmt.Sprintf("[video_bg][video]overlay=x=0:y='if(lt(t,%f),H-H*t/%f,if(gt(t,%f),-H*(t-%f)/%f,0))':format=auto[video_slide_raw];", transitionT, transitionT, videoFadeOutStart, videoFadeOutStart, transitionT)
+			// Split into parts for effects
+			filterComplex += "[video_slide_raw]split=3[raw1][raw2to4][raw5];"
+			filterComplex += fmt.Sprintf("[raw1]trim=start=0:end=%f,setpts=PTS-STARTPTS[part1];", part1End)
+			filterComplex += fmt.Sprintf("[raw2to4]trim=start=%f:end=%f,setpts=PTS-STARTPTS[part_rest_raw];", part2Start, part4End)
+			filterComplex += fmt.Sprintf("[raw5]trim=start=%f,setpts=PTS-STARTPTS[part5];", part5Start)
+
+			// Part 2 Effect: Quad-split (2x2 grid)
+			filterComplex += "[part_rest_raw]split=2[pr_main][pr_quad_src];"
+			filterComplex += fmt.Sprintf("[pr_quad_src]scale=%d:%d,split=4[q1][q2][q3][q4];", (videoW / 2), (videoH / 2))
+			filterComplex += "[q1][q2]hstack[top_row];"
+			filterComplex += "[q3][q4]hstack[bot_row];"
+			filterComplex += "[top_row][bot_row]vstack[quad];"
+			filterComplex += fmt.Sprintf("[pr_main][quad]overlay=enable='between(t,0,%f)':eof_action=pass[part_rest_step1];", pLen)
+			// Transition: Frei0r Distort0r between Part 2 and Part 3
+			filterComplex += "[part_rest_step1]split=2[pr_step15_main][distort_src];"
+			filterComplex += "[distort_src]frei0r=filter_name=distort0r:filter_params=0.5|0.005|y|0.25[distorted];"
+			filterComplex += fmt.Sprintf("[pr_step15_main][distorted]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest_step15];", (pLen - transitionT/2), (pLen + transitionT/2))
+			// Part 3 Effect: Slow/Fast time warp
+			p3LocalStart := part3Start - part2Start
+			p3LocalEnd := part3End - part2Start
+			filterComplex += "[part_rest_step15]split=2[pr_step2_main][p3_src];"
+			filterComplex += fmt.Sprintf("[p3_src]trim=start=%f:end=%f,setpts=PTS-STARTPTS[p3_trim];", p3LocalStart, p3LocalEnd)
+			filterComplex += fmt.Sprintf("[p3_trim]setpts='if(lt(T, %f/4), 2*PTS + %f/TB, (2/3)*PTS + (%f/3 + %f)/TB)'[p3_warp];", pLen, p3LocalStart, pLen, p3LocalStart)
+			filterComplex += fmt.Sprintf("[pr_step2_main][p3_warp]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest_step2];", p3LocalStart, p3LocalEnd)
+			// Transition: Spin effect between Part 3 and Part 4
+			filterComplex += fmt.Sprintf("[part_rest_step2]rotate=a='if(between(t,%f,%f), 2*PI*(t-%f)/%f, 0)':ow=iw:oh=ih:c=black[part_rest_step25];", (pLen*2 - transitionT/2), (pLen*2 + transitionT/2), (pLen*2 - transitionT/2), transitionT)
+			// Part 4 Effect: 3x3 grid
+			p4LocalStart := part4Start - part2Start
+			p4LocalEnd := part4End - part2Start
+			filterComplex += "[part_rest_step25]split=2[pr_step3_main][pr_grid3_src];"
+			filterComplex += fmt.Sprintf("[pr_grid3_src]scale=%d:%d,split=9[g1][g2][g3][g4][g5][g6][g7][g8][g9];", (videoW / 3), (videoH / 3))
+			filterComplex += "[g1][g2][g3]hstack=inputs=3[row1];"
+			filterComplex += "[g4][g5][g6]hstack=inputs=3[row2];"
+			filterComplex += "[g7][g8][g9]hstack=inputs=3[row3];"
+			filterComplex += "[row1][row2][row3]vstack=inputs=3[grid3];"
+			filterComplex += fmt.Sprintf("[pr_step3_main][grid3]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest_step4];", p4LocalStart, p4LocalEnd)
+			// Part 4 Reverse Boomerang Effect
+			p4LocalMid := p4LocalStart + (p4LocalEnd-p4LocalStart)/2
+			filterComplex += "[part_rest_step4]split=2[pr_step4_main][p4_to_rev];"
+			filterComplex += fmt.Sprintf("[p4_to_rev]trim=start=%f:end=%f,setpts=PTS-STARTPTS,reverse,setpts=PTS+(%f/TB)[p4_rev];", p4LocalStart, p4LocalMid, p4LocalMid)
+			filterComplex += fmt.Sprintf("[pr_step4_main][p4_rev]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest];", p4LocalMid, p4LocalEnd)
+			// Xfade 1: Part 1 and Parts 2-4
+			xFadeOffset1 := part1End - transitionT
+			filterComplex += fmt.Sprintf("[part1][part_rest]xfade=transition=fade:duration=%f:offset=%f[video_step1];", transitionT, xFadeOffset1)
+			// Xfade 2: video_step1 and Part 5
+			xFadeOffset2 := part4End - transitionT
+			filterComplex += fmt.Sprintf("[video_step1][part5]xfade=transition=fade:duration=%f:offset=%f[video_effects];", transitionT, xFadeOffset2)
+
+			// --- Build list of streams to concatenate ---
+			var concatStreams []string
+
+			// If hasImage, build client image part
+			if hasImage {
 				clientFadeOutStart := imageT - transitionT
-				videoFadeOutStart := videoT - transitionT
-				videoEndFadeStart := preLogoVisualT - transitionT
-				pLen := (videoT + 2*transitionT) / 5
-
-				part1End := pLen
-
-				// xfade 1 setup: part1 and part2 overlap by transitionT
-				part2Start := part1End - transitionT
-				part2End := part2Start + pLen
-
-				part3Start := part2End
-				part3End := part3Start + pLen
-
-				part4Start := part3End
-				part4End := part4Start + pLen
-
-				part5Start := part4End - transitionT
-
-				textFadeInStart := imageT - transitionT
-				textFadeInEnd := imageT
-				textFadeOutStart := videoEndFadeStart
-
-				fmt.Printf("Client: %f, Video: %f, Logo: %f, Total: %f\n", imageT, videoT, imageT, (imageT + videoT + imageT))
-
-				// Scale and prepare all video inputs
-				// Client image fade out to black at the end
-				filterComplex := fmt.Sprintf("[0:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS,fade=t=out:st=%f:d=%f[client];", videoW, videoH, clientFadeOutStart, transitionT)
-				filterComplex += fmt.Sprintf("[1:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video];", videoW, videoH)
-				// TODO: is this needed? logo is an image i control, with the correct dimensions
-				// use this??
-				// filterComplex += fmt.Sprintf("[2:v]fps=30,setpts=PTS-STARTPTS,fade=t=in:st=0:d=%d[logo];", transitionT)
-				// logo: scale + fade-in from black
-				filterComplex += fmt.Sprintf("[2:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%f[logo];", videoW, videoH, transitionT)
-				// Slide-up entrance + slide-out exit for main video (both over TRANSITION_DURATION)
-				// Slide-up: y goes H -> 0 in first TD seconds
-				// Slide-out: y goes 0 -> -H in last TD seconds (slides up off-screen)
-				filterComplex += fmt.Sprintf("color=c=black:s=%dx%d:d=%f:r=30[video_bg];", videoW, videoH, videoT)
-
-				filterComplex += fmt.Sprintf("[video_bg][video]overlay=x=0:y='if(lt(t,%f),H-H*t/%f,if(gt(t,%f),-H*(t-%f)/%f,0))':format=auto[video_slide_raw];", transitionT, transitionT, videoFadeOutStart, videoFadeOutStart, transitionT)
-
-				// split video int part1, part2-4 and part5 for xfades
-				filterComplex += "[video_slide_raw]split=3[raw1][raw2to4][raw5];"
-				// Part 1: From the beginning (including slide-up) until PART1_END
-				filterComplex += fmt.Sprintf("[raw1]trim=start=0:end=%f,setpts=PTS-STARTPTS[part1];", part1End)
-				// Parts 2-4: Starting from PART2_START until PART4_END
-				filterComplex += fmt.Sprintf("[raw2to4]trim=start=%f:end=%f,setpts=PTS-STARTPTS[part_rest_raw];", part2Start, part4End)
-				// Part 5: Starting from PART5_START
-				filterComplex += fmt.Sprintf("[raw5]trim=start=%f,setpts=PTS-STARTPTS[part5];", part5Start)
-
-				// --- Part 2 Effect: Quad-split (2x2 grid) ---
-				filterComplex += "[part_rest_raw]split=2[pr_main][pr_quad_src];"
-				filterComplex += fmt.Sprintf("[pr_quad_src]scale=%d:%d,split=4[q1][q2][q3][q4];", (videoW / 2), (videoH / 2))
-				filterComplex += "[q1][q2]hstack[top_row];"
-				filterComplex += "[q3][q4]hstack[bot_row];"
-				filterComplex += "[top_row][bot_row]vstack[quad];"
-				// Overlay quad on normal video only during Part 2's timeframe (0 to P_LEN)
-				filterComplex += fmt.Sprintf("[pr_main][quad]overlay=enable='between(t,0,%f)':eof_action=pass[part_rest_step1];", pLen)
-				// --- Transition: Frei0r Distort0r between Part 2 and Part 3 ---
-				filterComplex += "[part_rest_step1]split=2[pr_step15_main][distort_src];"
-				filterComplex += "[distort_src]frei0r=filter_name=distort0r:filter_params=0.5|0.005|y|0.25[distorted];"
-				filterComplex += fmt.Sprintf("[pr_step15_main][distorted]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest_step15];", (pLen - transitionT/2), (pLen + transitionT/2))
-				// --- Part 3 Effect: Slow/Fast time warp ---
-				// Part 3 plays in slow-motion for the first half, speeding up for the second half
-				p3LocalStart := part3Start - part2Start
-				p3LocalEnd := part3End - part2Start
-				filterComplex += "[part_rest_step15]split=2[pr_step2_main][p3_src];"
-				filterComplex += fmt.Sprintf("[p3_src]trim=start=%f:end=%f,setpts=PTS-STARTPTS[p3_trim];", p3LocalStart, p3LocalEnd)
-				// T is current time in seconds. First 1/4 of source duration plays at 0.5x speed (takes 1/2 of output P_LEN).
-				// Remaining 3/4 plays at 1.5x speed (takes remaining 1/2 of output P_LEN).
-				// PTS mapping securely warps timestamps precisely to fit exactly within P_LEN without breaking overlaps!
-				filterComplex += fmt.Sprintf("[p3_trim]setpts='if(lt(T, %f/4), 2*PTS + %f/TB, (2/3)*PTS + (%f/3 + %f)/TB)'[p3_warp];", pLen, p3LocalStart, pLen, p3LocalStart)
-				// Overlay exactly during Part 3's timeframe
-				filterComplex += fmt.Sprintf("[pr_step2_main][p3_warp]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest_step2];", p3LocalStart, p3LocalEnd)
-				// --- Transition: Spin effect between Part 3 and Part 4 ---
-				// Creates a fast 360-degree dizzy spin precisely across the explicit frame cut boundary
-				filterComplex += fmt.Sprintf("[part_rest_step2]rotate=a='if(between(t,%f,%f), 2*PI*(t-%f)/%f, 0)':ow=iw:oh=ih:c=black[part_rest_step25];", (pLen*2 - transitionT/2), (pLen*2 + transitionT/2), (pLen*2 - transitionT/2), transitionT)
-				// --- Part 4 Effect: 3x3 grid ---
-				// Part 4 timestamps need to be shifted because part_rest starts at PART2_START
-				p4LocalStart := part4Start - part2Start
-				p4LocalEnd := part4End - part2Start
-				filterComplex += "[part_rest_step25]split=2[pr_step3_main][pr_grid3_src];"
-				filterComplex += fmt.Sprintf("[pr_grid3_src]scale=%d:%d,split=9[g1][g2][g3][g4][g5][g6][g7][g8][g9];", (videoW / 3), (videoH / 3))
-				filterComplex += "[g1][g2][g3]hstack=inputs=3[row1];"
-				filterComplex += "[g4][g5][g6]hstack=inputs=3[row2];"
-				filterComplex += "[g7][g8][g9]hstack=inputs=3[row3];"
-				filterComplex += "[row1][row2][row3]vstack=inputs=3[grid3];"
-				// Overlay 3x3 grid only during Part 4's explicit timeframe
-				filterComplex += fmt.Sprintf("[pr_step3_main][grid3]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest_step4];", p4LocalStart, p4LocalEnd)
-				// --- Part 4 Reverse Boomerang Effect ---
-				// Cut Part 4 in half: play the first half normally, and the first half reversed during the second half
-				p4LocalMid := p4LocalStart + (p4LocalEnd-p4LocalStart)/2
-				filterComplex += "[part_rest_step4]split=2[pr_step4_main][p4_to_rev];"
-				// Trim the exact floating-point first half, reverse it, shift PTS to map precisely onto the second half
-				filterComplex += fmt.Sprintf("[p4_to_rev]trim=start=%f:end=%f,setpts=PTS-STARTPTS,reverse,setpts=PTS+(%f/TB)[p4_rev];", p4LocalStart, p4LocalMid, p4LocalMid)
-				// Overlay reversed snippet safely during the second half, strictly enduring the xfade
-				filterComplex += fmt.Sprintf("[pr_step4_main][p4_rev]overlay=enable='between(t,%f,%f)':eof_action=pass[part_rest];", p4LocalMid, p4LocalEnd)
-				// Xfade 1: Part 1 and Parts 2-4
-				xFadeOffset1 := part1End - transitionT
-				filterComplex += fmt.Sprintf("[part1][part_rest]xfade=transition=fade:duration=%f:offset=%f[video_step1];", transitionT, xFadeOffset1)
-				// Xfade 2: video_step1 (which ends exactly at PART4_END) and Part 5
-				xFadeOffset2 := part4End - transitionT
-				filterComplex += fmt.Sprintf("[video_step1][part5]xfade=transition=fade:duration=%f:offset=%f[video_slide];", transitionT, xFadeOffset2)
-				// Concatenate: client (with fade-out) -> main video (with slide-up + quad effect)
-				// settb=AVTB normalizes timebase so xfade inputs match
-				filterComplex += "[client][video_slide]concat=n=2:v=1:a=0,settb=AVTB[client_video_raw];"
-				// Concatenate: client_video_raw -> logo (with fade-in)
-				filterComplex += "[client_video_raw][logo]concat=n=2:v=1:a=0[video_combined];"
-
-				// --- Dynamic Text Overlay Logic (Case 1) ---
-				curV := "video_combined"
-
-				// 1. Event text
-				if cmd.Flags().Changed("text") {
-					filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:line_spacing=%d:text_align=center:alpha='if(lt(t,%f),0,if(lt(t,%f),(t-%f)/%f,if(gt(t,%f),(1-(t-%f)/%f),1)))'[v_ev];", curV, eventText, eventTextX, eventTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, lineSpacing, textFadeInStart, textFadeInEnd, textFadeInStart, transitionT, textFadeOutStart, textFadeOutStart, transitionT)
-					curV = "v_ev"
-				}
-
-				filterComplex += fmt.Sprintf("[%s]null[v_with_text];", curV)
-
-				// Identify the audio source and handle optional music/video audio
-				currentStream := "v_with_text"
-				if cmd.Flags().Changed("music") {
-					// Music covers the full duration
-					filterComplex += fmt.Sprintf("[3:a]afade=t=in:st=0:d=%f,atrim=0:%f,asetpts=PTS-STARTPTS,afade=t=out:st=%f:d=%f[a_out];", transitionT, totalT, (totalT - transitionT), transitionT)
-				} else {
-					// No music, generate silence to prevent ffmpeg crash
-					filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%f,asetpts=PTS-STARTPTS[a_out];", totalT)
-				}
-
-				filterComplex += fmt.Sprintf("[%s]null[v_out]", currentStream)
-
-				ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
-
-			} else {
-				// Case 2: main video + fade out + logo video (no client)
-				totalT = videoT + transitionT + imageT
-				logoTransitionStart := videoT + transitionT
-				videoEndFadeStart := videoT + transitionT
-
-				fmt.Printf("Client: %f, Video: %f, Logo: %f, Total: %f\n", imageT, videoT, imageT, (imageT + videoT + imageT))
-
-				// Scale and prepare video inputs
-				filterComplex := fmt.Sprintf("[0:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video_raw];", videoW, videoH)
-				filterComplex += fmt.Sprintf("[1:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS[logo];", videoW, videoH)
-
-				// Transition from input_video to logo
-				filterComplex += fmt.Sprintf("[video_raw][logo]xfade=transition=fade:duration=%f:offset=%f[video_combined];", transitionT, logoTransitionStart)
-
-				// --- Dynamic Text Overlay Logic (Case 2) ---
-				curV := "video_combined"
-				if cmd.Flags().Changed("text") {
-					filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:line_spacing=%d:text_align=center:alpha='if(gt(t,%f),(1-(t-%f)/%f),1)'[v_out];", curV, eventText, eventTextX, eventTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, lineSpacing, videoEndFadeStart, videoEndFadeStart, transitionT)
-				} else {
-					filterComplex += fmt.Sprintf("[%s]null[v_out];", curV)
-				}
-
-				// Audio: Handle optional music and silent videos
-				if cmd.Flags().Changed("music") {
-					// Music covers the full duration
-					filterComplex += fmt.Sprintf("[2:a]afade=t=in:st=0:d=%f,atrim=0:%f,asetpts=PTS-STARTPTS,afade=t=out:st=%f:d=%f[a_out];", transitionT, totalT, (totalT - transitionT), transitionT)
-				} else {
-					// No music, generate silence to prevent ffmpeg crash
-					filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%f,asetpts=PTS-STARTPTS[a_out];", totalT)
-				}
-
-				ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
+				filterComplex += fmt.Sprintf("[%d:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS,fade=t=out:st=%f:d=%f[client];", imgIdx, videoW, videoH, clientFadeOutStart, transitionT)
+				concatStreams = append(concatStreams, "client")
 			}
+
+			// Add video effects
+			concatStreams = append(concatStreams, "video_effects")
+
+			// If hasLogo, build logo part
+			if hasLogo {
+				filterComplex += fmt.Sprintf("[%d:v]scale=%d:%d:force_original_aspect_ratio=disable,setsar=1,fps=30,setpts=PTS-STARTPTS,settb=AVTB,fade=t=in:st=0:d=%f[logo];", logoIdx, videoW, videoH, transitionT)
+				concatStreams = append(concatStreams, "logo")
+			}
+
+			// --- Concatenate all streams ---
+			n := len(concatStreams)
+			if n > 1 {
+				var concatInputs string
+				for _, s := range concatStreams {
+					concatInputs += fmt.Sprintf("[%s]", s)
+				}
+				filterComplex += fmt.Sprintf("%sconcat=n=%d:v=1:a=0,settb=AVTB[video_combined];", concatInputs, n)
+			} else {
+				filterComplex += "[video_effects]null[video_combined];"
+			}
+
+			// --- Text overlay ---
+			curV := "video_combined"
+			if hasText {
+				var textFadeInStart, textFadeInEnd, textFadeOutStart float64
+				if hasImage {
+					textFadeInStart = imageT - transitionT
+					textFadeInEnd = imageT
+				}
+				if hasLogo {
+					if hasImage {
+						textFadeOutStart = imageT + videoT - transitionT
+					} else {
+						textFadeOutStart = videoT - transitionT
+					}
+				}
+
+				var alpha string
+				switch {
+				case hasImage && hasLogo:
+					alpha = fmt.Sprintf("alpha='if(lt(t,%f),0,if(lt(t,%f),(t-%f)/%f,if(gt(t,%f),(1-(t-%f)/%f),1)))'", textFadeInStart, textFadeInEnd, textFadeInStart, transitionT, textFadeOutStart, textFadeOutStart, transitionT)
+				case hasImage && !hasLogo:
+					alpha = fmt.Sprintf("alpha='if(lt(t,%f),0,if(lt(t,%f),(t-%f)/%f,1))'", textFadeInStart, textFadeInEnd, textFadeInStart, transitionT)
+				case !hasImage && hasLogo:
+					alpha = fmt.Sprintf("alpha='if(gt(t,%f),(1-(t-%f)/%f),1)'", textFadeOutStart, textFadeOutStart, transitionT)
+				}
+
+				if alpha != "" {
+					filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:line_spacing=%d:text_align=center:%s[v_ev];", curV, eventText, eventTextX, eventTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, lineSpacing, alpha)
+				} else {
+					filterComplex += fmt.Sprintf("[%s]drawtext=text='%s':x=%s:y=%s:fontfile=%s:fontsize=%d:fontcolor=%s:borderw=%d:bordercolor=%s:box=1:boxcolor=0x00000088:boxborderw=%d:line_spacing=%d:text_align=center[v_ev];", curV, eventText, eventTextX, eventTextY, font, fontSize, fontColor, borderW, borderColor, boxPadding, lineSpacing)
+				}
+				curV = "v_ev"
+			}
+			filterComplex += fmt.Sprintf("[%s]null[v_with_text];", curV)
+
+			// --- Audio ---
+			if hasMusic {
+				filterComplex += fmt.Sprintf("[%d:a]afade=t=in:st=0:d=%f,atrim=0:%f,asetpts=PTS-STARTPTS,afade=t=out:st=%f:d=%f[a_out];", musicIdx, transitionT, totalT, (totalT - transitionT), transitionT)
+			} else {
+				filterComplex += fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:%f,asetpts=PTS-STARTPTS[a_out];", totalT)
+			}
+			filterComplex += "[v_with_text]null[v_out]"
+
+			ffmpegEdit = append(ffmpegEdit, "-filter_complex", filterComplex)
 
 			ffmpegEdit = append(ffmpegEdit, "-map", "[v_out]")
 			ffmpegEdit = append(ffmpegEdit, "-map", "[a_out]")
