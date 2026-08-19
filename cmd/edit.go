@@ -109,8 +109,8 @@ var editCmd = &cobra.Command{
 				totalT = imageT + videoT + imageT
 			case hasImage && !hasLogo:
 				totalT = imageT + videoT
-			case !hasImage && hasLogo:
-				totalT = videoT + imageT - transitionT
+		case !hasImage && hasLogo:
+			totalT = videoT + imageT
 			default:
 				totalT = videoT
 			}
@@ -384,9 +384,6 @@ func fileDuration(path string) (float64, error) {
 func validArgs(cmd *cobra.Command) error {
 	if cmd.Flags().Changed("logo") {
 		_, err := os.Stat(logo)
-		if err != nil {
-			return err
-		}
 		if err != nil {
 			return err
 		}

@@ -61,14 +61,14 @@ test for it.
 
 [x] Handle incorrect image size.
 
+[ ] Change -logo to be optional.
+
 [ ] Implement -run and -save flags.
 
 [ ] Improve error message for init, and provably other commands, "eventos init"
 indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
 
 [ ] Change generated qr to 302,362*302,362 px or 80 mm
-
-[ ] Change -logo to be optional.
 
 [ ] Add a notification when copy, format or edit finish
 
@@ -77,6 +77,8 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 [ ] Update the message when calling catalog subcommand
 
 [ ] Reduce times show to two digits precision.
+
+[ ] Change edit.go line 166 to show the times instead of true/false
 
 ---
 
@@ -102,44 +104,41 @@ fade-in,all effects, fade-out
 
 ---
 
-go run . edit -logo 500-500.png
+go run . edit --logo 500-500.png
 
 Needs fade-in, all effects, cross-fade, logo
 
 ---
 
-go run . edit -music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus
+go run . edit --music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus
 
-Cannot test, it just error with this
-
-Error: accepts 0 arg(s), received 1
 
 ---
 
-go run . edit -music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus -logo 500-500.png
+go run . edit --music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus --logo 500-500.png
 
 ---
 
 ---
 
-go run . edit -image 500-500.png
+go run . edit --image 500-500.png
 
 ---
 
 ---
 
-go run . edit -image 500-500.png -logo 500-500.png
+go run . edit --image 500-500.png --logo 500-500.png
 
 ---
 
 ---
 
-go run . edit -image 500-500.png -music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus
+go run . edit --image 500-500.png --music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus
 
 ---
 
 ---
 
-go run . edit -image 500-500.png -music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus -logo 500-500.png
+go run . edit --image 500-500.png --music ~/Videos/eventos/assets/musica/cortado/electronica/mix-electronica-yamila.opus --logo 500-500.png
 
 ---
