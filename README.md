@@ -61,7 +61,9 @@ test for it.
 
 [x] Handle incorrect image size.
 
-[ ] Change -logo to be optional.
+[x] Change -logo to be optional.
+
+[x] Change edit.go line 166 to show the times instead of true/false
 
 [ ] Implement -run and -save flags.
 
@@ -76,9 +78,9 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 
 [ ] Update the message when calling catalog subcommand
 
-[ ] Reduce times show to two digits precision.
+[ ] Reduce all time outputs to show two digits precision.
 
-[ ] Change edit.go line 166 to show the times instead of true/false
+[ ] Handle Ctrl+c interrupt, currently my cli closes but ffmpeg stay running in the background i think, check first
 
 ---
 

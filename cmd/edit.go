@@ -109,8 +109,8 @@ var editCmd = &cobra.Command{
 				totalT = imageT + videoT + imageT
 			case hasImage && !hasLogo:
 				totalT = imageT + videoT
-		case !hasImage && hasLogo:
-			totalT = videoT + imageT
+			case !hasImage && hasLogo:
+				totalT = videoT + imageT
 			default:
 				totalT = videoT
 			}
@@ -163,7 +163,19 @@ var editCmd = &cobra.Command{
 			part4End := part4Start + pLen
 			part5Start := part4End - transitionT
 
-			fmt.Printf("Image: %v, Logo: %v, Video: %f, Total: %f\n", hasImage, hasLogo, videoT, totalT)
+			fmt.Print("Image: ")
+			if hasImage {
+				fmt.Print(imageT)
+			} else {
+				fmt.Print("0")
+			}
+			fmt.Print("s, Logo: ")
+			if hasLogo {
+				fmt.Print(imageT)
+			} else {
+				fmt.Print("0")
+			}
+			fmt.Printf("s, Video: %fs, Total: %fs\n", videoT, totalT)
 
 			// Scale video
 			filterComplex = fmt.Sprintf("[%d:v]scale=%d:%d,fps=30,setpts=PTS-STARTPTS[video];", videoIdx, videoW, videoH)
