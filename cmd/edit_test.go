@@ -28,7 +28,7 @@ func TestPreRun(t *testing.T) {
 				cmd.Flags().Set(k, v)
 			}
 
-			err := preRun(cmd)
+			err := preRunEdit(cmd)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("got: '%v', want: '%v'", err, tt.wantErr)
 			}
