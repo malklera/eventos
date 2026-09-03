@@ -39,12 +39,9 @@ var editCmd = &cobra.Command{
 	Short: "Command to edit the videos",
 	Args:  cobra.ExactArgs(0),
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		return preRun(cmd)
+		return preRunEdit(cmd)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := validArgs(cmd); err != nil {
-			return err
-		}
 		videoW := 1080
 		videoH := 1920
 		transitionT := 1.0
@@ -354,14 +351,16 @@ func init() {
 	rootCmd.AddCommand(editCmd)
 }
 
-func preRun(cmd *cobra.Command) error {
+// preRunEdit check for mutually mandatory flags and the validity of the
+// arguments
+func preRunEdit(cmd *cobra.Command) error {
 	if !cmd.Flags().Changed("text") && cmd.Flags().Changed("text-color") {
 		return ErrTextColorWithoutText
 	}
 	if !cmd.Flags().Changed("text") && cmd.Flags().Changed("font") {
 		return ErrFontWithoutText
 	}
-	return nil
+	return validArgs(cmd)
 }
 
 func wrapText(text string, fontSize int, videoW int, margin int) string {
