@@ -68,6 +68,8 @@ test for it.
 [x] ~Change generated qr to 302,362*302,362 px or 80 mm~ Added -template flag
 to insert the qr directly.
 
+[x] Update the message when calling catalog subcommand
+
 [ ] Implement -run and -save flags.
 
 [ ] Improve error message for init, and provably other commands, "eventos init"
@@ -76,8 +78,6 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 [ ] Improve error for copy, add "eventos copy <source> <destination>"
 
 [ ] Add a notification when copy, format or edit finish
-
-[ ] Update the message when calling catalog subcommand
 
 [ ] Reduce all time outputs to show two digits precision.
 
