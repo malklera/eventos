@@ -65,16 +65,17 @@ test for it.
 
 [x] Change edit.go line 166 to show the times instead of true/false
 
+[x] ~Change generated qr to 302,362*302,362 px or 80 mm~ Added -template flag
+to insert the qr directly.
+
 [ ] Implement -run and -save flags.
 
 [ ] Improve error message for init, and provably other commands, "eventos init"
 indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
 
-[ ] Change generated qr to 302,362*302,362 px or 80 mm
+[ ] Improve error for copy, add "eventos copy <source> <destination>"
 
 [ ] Add a notification when copy, format or edit finish
-
-[ ] Improve error for copy, add "eventos copy <source> <destination>"
 
 [ ] Update the message when calling catalog subcommand
 
@@ -85,7 +86,7 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 ---
 
 | imagen | music | logo |
--
+---|---|---|
 | n | n | n |
 | n | n | y |
 | n | y | n |
@@ -94,7 +95,6 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 | y | n | y |
 | y | y | n |
 | y | y | y |
--
 
 
 ---

@@ -3,6 +3,7 @@ module github.com/malklera/eventos
 go 1.26.3
 
 require (
+	github.com/beevik/etree v1.7.1
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/spf13/cobra v1.10.2
 	github.com/yeqown/go-qrcode/v2 v2.2.5
@@ -15,6 +16,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/yeqown/reedsolomon v1.0.0 // indirect
-	golang.org/x/image v0.10.0 // indirect
+	golang.org/x/image v0.45.0 // indirect
 )
