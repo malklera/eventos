@@ -37,6 +37,10 @@ Font size: 110
 
 ## TODO
 
+- [ ] Rotate the pdf 90 degress
+
+- [x] bug in "eventos catalog">"Originals" it counts all files, it has to count only images
+
 - [ ] Implement -run and -save flags.
 
 - [ ] Improve error message for init, and provably other commands, "eventos init"

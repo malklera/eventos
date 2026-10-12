@@ -18,9 +18,11 @@ var catalogCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("os.ReadDir(\"cortado\"): %w", err)
 		}
-		fmt.Println("Originals:", len(files))
+		img := 0
+		vid := 0
 		for _, file := range files {
 			if strings.HasSuffix(file.Name(), ".png") {
+				img += 1
 				number, _, _ := strings.Cut(file.Name(), "-")
 				src := filepath.Join("cortado", file.Name())
 				dst := filepath.Join("catalogo", number+".png")
@@ -28,13 +30,19 @@ var catalogCmd = &cobra.Command{
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "os.Rename(%s, %s): %v\n", src, dst, err)
 				}
+			} else {
+				vid += 1
 			}
 		}
+
+		fmt.Println("Images:", img)
+		fmt.Println("Videos:", vid)
+
 		fp, err := os.ReadDir("catalogo")
 		if err != nil {
 			return fmt.Errorf("os.ReadDir(\"catalogo\"): %w", err)
 		}
-		fmt.Println("Copied:", len(fp))
+		fmt.Println("Catalog:", len(fp))
 		return nil
 	},
 }
