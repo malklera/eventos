@@ -6,7 +6,7 @@ This CLI is used to manage and edit videos used in the 360 Platform service by
 To install.
 
 ```sh
-go install -ldflags "-X 'github.com/malklera/eventos/cmd.tag=$(git describe --tags --exact-match 2>/dev/null || echo dev)'"
+go install -ldflags "-X 'github.com/malklera/eventos/cmd.tag=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)'"
 ```
 
 To use read the steps given by `eventos help`.
@@ -37,7 +37,7 @@ Font size: 110
 
 ## TODO
 
-- [ ] Rotate the pdf 90 degress
+- [x] Rotate the pdf 90 degress
 
 - [x] bug in "eventos catalog">"Originals" it counts all files, it has to count only images
 
@@ -53,6 +53,8 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 - [ ] Reduce all time outputs to show two digits precision.
 
 - [ ] Handle Ctrl+c interrupt, currently my cli closes but ffmpeg stay running in the background i think, check first
+
+- [ ] Replace inkscape with a c++ library to convert svg to pdf
 
 ---
 
