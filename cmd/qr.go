@@ -26,7 +26,11 @@ func (nopWriteCloser) Close() error { return nil }
 var qrCmd = &cobra.Command{
 	Use:   "qr <url>",
 	Short: "Generate the QR code image for the event.",
-	Long:  `e.g. ./eventos qr <url>`,
+	Long:  `To generate the QR as a jpeg use ./eventos qr <url>
+
+			If you want a PDF ready to be printed, have to create a SVG with with one or more elements with 'id=replace*' where * can be anything else, all elements with an 'id' that begans with 'replace' will be replace with the QR code, in the same place and the same size, do not apply modifycations to the element because they will be dropped, if you want to edit the final QR, edit the parent element instead.
+
+				./eventos qr -t <path-to-template> <url>`,
 	Args:  cobra.ExactArgs(1),
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		return preRunQR(cmd)
@@ -66,7 +70,8 @@ func init() {
 	rootCmd.AddCommand(qrCmd)
 }
 
-// preRunQR checks that the file name passed as argument exists
+// preRunQR checks that the file name passed as argument exists and inkscape is
+// installed as 'inkscape'
 func preRunQR(cmd *cobra.Command) error {
 	if cmd.Flags().Changed("template") {
 		_, err := os.Stat(template)
@@ -108,7 +113,7 @@ func insertImg(uri string) (*etree.Document, error) {
 	repl := svg.FindElementsPath(path)
 	for i, c := range repl {
 		if strings.HasPrefix(c.SelectAttrValue("id", "nil"), "replace") {
-			svg.Root().CreateChild("image", func(e *etree.Element) {
+			c.Parent().CreateChild("image", func(e *etree.Element) {
 				e.CreateAttr("id", fmt.Sprintf("qr%d", i))
 				e.CreateAttr("x", c.SelectAttrValue("x", "nil"))
 				e.CreateAttr("y", c.SelectAttrValue("y", "nil"))
@@ -123,7 +128,7 @@ func insertImg(uri string) (*etree.Document, error) {
 	return svg, nil
 }
 
-// exportPDF takes a SVG and saves it as a PDF using inkscape
+// exportPDF takes a SVG and saves it as a PDF using inkscape cli
 func exportPDF(svg *etree.Document, file string) error {
 	src, err := svg.WriteToString()
 	if err != nil {
