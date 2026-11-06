@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/gen2brain/beeep"
 )
 
 // copyCmd represents the copy command
@@ -38,7 +39,9 @@ var copyCmd = &cobra.Command{
 			dst := filepath.Join(original, file.Name())
 			err := copyFile(src, dst)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "copyFile(%s, %s): %v\n", src, dst, err)
+				msg := fmt.Sprintf("copyFile(%s, %s): %v\n", src, dst, err)
+				fmt.Fprint(os.Stderr, msg)
+				_ = beeep.Notify("eventos copy", msg, "X")
 			} else {
 				count++
 				fmt.Println("Copied:", src)
@@ -48,6 +51,7 @@ var copyCmd = &cobra.Command{
 		fmt.Println("Total src videos:", len(files))
 		fmt.Println("Total copied:", count)
 		fmt.Println("Time taken:", time.Since(start))
+		_ = beeep.Notify("eventos copy", "Finished copying", "!")
 		return nil
 	},
 }
