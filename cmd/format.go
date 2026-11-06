@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/gen2brain/beeep"
+	"github.com/spf13/cobra"
 )
 
 // formatCmd represents the format command
