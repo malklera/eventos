@@ -48,7 +48,9 @@ indicates to pass \[flags\] but init do not have flags, it should say "path to e
 
 - [x] Move the total video from before copying to the end so i can compare originals and copied
 
-- [ ] Add a notification when copy, format or edit finish
+- [x] Add a notification when copy, format or edit finish
+
+- [ ] Replace "X" and "!" for all notifications with actual icons.
 
 - [ ] Reduce all time outputs to show two digits precision.
 
