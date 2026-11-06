@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/gen2brain/beeep"
 )
 
 // formatCmd represents the format command
@@ -51,6 +52,7 @@ var formatCmd = &cobra.Command{
 			err := ffmpeg.Run()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error running %s: %v\n", ffmpeg.String(), err)
+				_ = beeep.Notify("eventos format", fmt.Sprintf("Error formating %s", file.Name()), "X")
 			} else {
 				done++
 			}
@@ -58,6 +60,7 @@ var formatCmd = &cobra.Command{
 		fmt.Println("Total files:", count)
 		fmt.Println("Files formated:", done)
 		fmt.Println("Time taken:", time.Since(start))
+		_ = beeep.Notify("eventos format", "Finished formating", "!")
 		return nil
 	},
 }
