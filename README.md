@@ -43,10 +43,8 @@ Font size: 110
 
 - [ ] Implement -run and -save flags.
 
-- [ ] Improve error message for init, and provably other commands, "eventos init"
+- [x] Improve error message for init, and provably other commands, "eventos init"
 indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
-
-- [ ] Improve error for copy, add "eventos copy <source> <destination>", allow to not put destination
 
 - [x] Move the total video from before copying to the end so i can compare originals and copied
 
