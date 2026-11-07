@@ -253,11 +253,11 @@ var editCmd = &cobra.Command{
 			// --- Concatenate all streams ---
 			n := len(concatStreams)
 			if n > 1 {
-				var concatInputs string
+				var concatInputs strings.Builder
 				for _, s := range concatStreams {
-					concatInputs += fmt.Sprintf("[%s]", s)
+					fmt.Fprintf(&concatInputs, "[%s]", s)
 				}
-				filterComplex += fmt.Sprintf("%sconcat=n=%d:v=1:a=0,settb=AVTB[video_combined];", concatInputs, n)
+				filterComplex += fmt.Sprintf("%sconcat=n=%d:v=1:a=0,settb=AVTB[video_combined];", concatInputs.String(), n)
 			} else {
 				filterComplex += "[video_effects]null[video_combined];"
 			}
