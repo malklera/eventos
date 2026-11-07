@@ -37,18 +37,7 @@ Font size: 110
 
 ## TODO
 
-- [x] Rotate the pdf 90 degress
-
-- [x] bug in "eventos catalog">"Originals" it counts all files, it has to count only images
-
 - [ ] Implement -run and -save flags.
-
-- [x] Improve error message for init, and provably other commands, "eventos init"
-indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
-
-- [x] Move the total video from before copying to the end so i can compare originals and copied
-
-- [x] Add a notification when copy, format or edit finish
 
 - [ ] Replace "X" and "!" for all notifications with actual icons.
 
