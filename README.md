@@ -6,7 +6,7 @@ This CLI is used to manage and edit videos used in the 360 Platform service by
 To install.
 
 ```sh
-go install -ldflags "-X 'github.com/malklera/eventos/cmd.tag=$(git describe --tags 2>/dev/null || echo dev)'"
+go install -ldflags "-X 'github.com/malklera/eventos/cmd.tag=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)'"
 ```
 
 To use read the steps given by `eventos help`.
@@ -37,51 +37,15 @@ Font size: 110
 
 ## TODO
 
-[x] Add command or flag to point to the assets like "1 - Indicaciones.odt". Change
-my mind, not going to do this.
+- [ ] Implement -run and -save flags.
 
-[x] In init command allow to pass a path.
+- [ ] Replace "X" and "!" for all notifications with actual icons.
 
-[x] Change the durations to return float64 instead of int.
+- [ ] Reduce all time outputs to show two digits precision.
 
-[x] Validate that all arguments of edit are valid, files exist, color are the correct format.
+- [ ] Handle Ctrl+c interrupt, currently my cli closes but ffmpeg stay running in the background i think, check first
 
-[x] Ensure copy can accept paths. Both path are mandatory.
-
-[x] Passing clientColor flag is only valid with clientText
-
-[x] Passing textColor flag is only valid with eventText
-
-[x] Use flag.Changed instead of checking for ""
-
-[x] Check the PreRunE in edit.go, i think it can be better, see about writing
-test for it.
-
-[x] Get ride of the client text related flags and code.
-
-[x] Handle incorrect image size.
-
-[x] Change -logo to be optional.
-
-[x] Change edit.go line 166 to show the times instead of true/false
-
-[x] ~Change generated qr to 302,362*302,362 px or 80 mm~ Added -template flag
-to insert the qr directly.
-
-[x] Update the message when calling catalog subcommand
-
-[ ] Implement -run and -save flags.
-
-[ ] Improve error message for init, and provably other commands, "eventos init"
-indicates to pass \[flags\] but init do not have flags, it should say "path to eventName" or something.
-
-[ ] Improve error for copy, add "eventos copy <source> <destination>"
-
-[ ] Add a notification when copy, format or edit finish
-
-[ ] Reduce all time outputs to show two digits precision.
-
-[ ] Handle Ctrl+c interrupt, currently my cli closes but ffmpeg stay running in the background i think, check first
+- [ ] Replace inkscape with a c++ library to convert svg to pdf
 
 ---
 

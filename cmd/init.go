@@ -13,7 +13,7 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Create the required directories to contain the event",
 	Long: `e.g. eventos init eventName
-	eventos init ~/Videos/eventos/eventName`,
+eventos init ~/Videos/eventos/eventName`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		event := args[0]

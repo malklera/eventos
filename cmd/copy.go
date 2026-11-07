@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/gen2brain/beeep"
 )
 
 // copyCmd represents the copy command
@@ -14,7 +15,12 @@ var copyCmd = &cobra.Command{
 	Use:   "copy",
 	Short: "Copy files from phone to pc.",
 	Long: `eventos copy srcPath dstPath
-	eventos copy ".../Almacenamiento interno/DCIM/Camera/<eventName>" "path/to/<eventName>"`,
+
+	Important to use quotes in the source path because it probably have a directory name
+	with space in it.
+
+	eventos copy ".../Almacenamiento interno/DCIM/Camera/<eventName>" "path/to/<eventName>"
+	eventos copy ".../Almacenamiento interno/DCIM/Camera/<eventName>" .`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 2 {
 			return fmt.Errorf("wrong number of arguments, got: %d, want: 2", len(args))
@@ -22,10 +28,9 @@ var copyCmd = &cobra.Command{
 
 		files, err := listVideos(args[0])
 		if err != nil {
-			return fmt.Errorf("reading '%s': %w", args[0], err)
+			return fmt.Errorf("listVideos('%s'): %w", args[0], err)
 		}
 
-		fmt.Println("Total src videos:", len(files))
 		count := 0
 		original := filepath.Join(args[1], "original")
 		start := time.Now()
@@ -34,14 +39,19 @@ var copyCmd = &cobra.Command{
 			dst := filepath.Join(original, file.Name())
 			err := copyFile(src, dst)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "copyFile(%s, %s): %v\n", src, dst, err)
+				msg := fmt.Sprintf("copyFile(%s, %s): %v\n", src, dst, err)
+				fmt.Fprint(os.Stderr, msg)
+				_ = beeep.Notify("eventos copy", msg, "X")
 			} else {
 				count++
 				fmt.Println("Copied:", src)
 			}
 		}
+
+		fmt.Println("Total src videos:", len(files))
 		fmt.Println("Total copied:", count)
 		fmt.Println("Time taken:", time.Since(start))
+		_ = beeep.Notify("eventos copy", "Finished copying", "!")
 		return nil
 	},
 }

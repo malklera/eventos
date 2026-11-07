@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gen2brain/beeep"
 	"github.com/mitchellh/go-wordwrap"
 	"github.com/spf13/cobra"
 )
@@ -87,6 +88,7 @@ var editCmd = &cobra.Command{
 			videoT, err := fileDuration(videoPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error getting the duration of '%s': %v", videoPath, err)
+				_ = beeep.Notify("eventos edit", "Error getting duration.", "X")
 				continue
 			}
 
@@ -115,6 +117,7 @@ var editCmd = &cobra.Command{
 			// Check music length
 			if hasMusic && musicT < totalT {
 				fmt.Fprintf(os.Stderr, "Error: music too short, musicT: %f, totalT: %f\n", musicT, totalT)
+				_ = beeep.Notify("eventos edit", "Error: music too short.", "X")
 				continue
 			}
 
@@ -250,11 +253,11 @@ var editCmd = &cobra.Command{
 			// --- Concatenate all streams ---
 			n := len(concatStreams)
 			if n > 1 {
-				var concatInputs string
+				var concatInputs strings.Builder
 				for _, s := range concatStreams {
-					concatInputs += fmt.Sprintf("[%s]", s)
+					fmt.Fprintf(&concatInputs, "[%s]", s)
 				}
-				filterComplex += fmt.Sprintf("%sconcat=n=%d:v=1:a=0,settb=AVTB[video_combined];", concatInputs, n)
+				filterComplex += fmt.Sprintf("%sconcat=n=%d:v=1:a=0,settb=AVTB[video_combined];", concatInputs.String(), n)
 			} else {
 				filterComplex += "[video_effects]null[video_combined];"
 			}
@@ -324,6 +327,7 @@ var editCmd = &cobra.Command{
 			err = ffmpeg.Run()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error running %s: %v\n", ffmpeg.String(), err)
+				_ = beeep.Notify("eventos edit", "Error formating video.", "X")
 			} else {
 				editedCount++
 			}
@@ -331,6 +335,7 @@ var editCmd = &cobra.Command{
 		fmt.Println("Total videos:", len(cuttedVideos))
 		fmt.Println("Edited videos:", editedCount)
 		fmt.Println("Time taken:", time.Since(start))
+		_ = beeep.Notify("eventos edit", "Finished editing.", "!")
 		return nil
 	},
 }
